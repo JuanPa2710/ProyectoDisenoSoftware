@@ -1,7 +1,37 @@
-bin/
-obj/
+# Compilación .NET
+**/bin/
+**/obj/
+
+# Visual Studio / Rider
 .vs/
+.idea/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+
+# Archivos locales y secretos
 .env
-appsettings.Development.json
+.env.*
+**/appsettings.Development.json
+**/appsettings.Local.json
+*.pfx
+
+# Logs y archivos temporales
+*.log
+*.tmp
+*.temp
+*.cache
+
+# Cobertura y resultados de pruebas
+TestResults/
+coverage/
+
+# Archivos generados durante tareas auxiliares
+tmp/
+output/
+crear_carga_trabajo.py
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
