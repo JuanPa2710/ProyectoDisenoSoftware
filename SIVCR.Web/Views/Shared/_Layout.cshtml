@@ -1,3 +1,8 @@
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var isHomeController = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
+}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -41,7 +46,7 @@
         <aside class="sivcr-sidebar" aria-label="Navegación principal">
             <div class="sivcr-sidebar__section-title">Análisis</div>
 
-            <a class="sivcr-nav-item sivcr-nav-item--active" asp-controller="Home" asp-action="Index">
+            <a class="sivcr-nav-item @(isHomeController && string.Equals(currentAction, "Index", StringComparison.OrdinalIgnoreCase) ? "sivcr-nav-item--active" : "")" asp-controller="Home" asp-action="Index">
                 <svg class="sivcr-nav-item__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                     <rect x="2.5" y="2.5" width="5" height="5" rx=".5" />
                     <rect x="12.5" y="2.5" width="5" height="5" rx=".5" />
@@ -57,7 +62,7 @@
                 </svg>
                 <span>Explorador de registros</span>
             </a>
-            <a class="sivcr-nav-item" asp-controller="Home" asp-action="FiltrosGuardados">
+            <a class="sivcr-nav-item @(isHomeController && string.Equals(currentAction, "FiltrosGuardados", StringComparison.OrdinalIgnoreCase) ? "sivcr-nav-item--active" : "")" asp-controller="Home" asp-action="FiltrosGuardados">
                 <svg class="sivcr-nav-item__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                     <path d="M5 3h10v14l-5-3-5 3V3Z" />
                 </svg>
