@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using SIVCR.Web.Models;
 using System.Diagnostics;
+//using MongoDB.Driver;
 
 namespace SIVCR.Web.Controllers {
     public class HomeController : Controller {
@@ -9,6 +10,10 @@ namespace SIVCR.Web.Controllers {
         }
 
         public IActionResult Privacy() {
+            return View();
+        }
+
+        public IActionResult FiltrosGuardados() {
             return View();
         }
 
