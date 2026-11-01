@@ -1,5 +1,16 @@
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpClient("CargaDatosApi", client =>
+{
+    var direccion = builder.Configuration["CargaDatosApi:BaseUrl"]
+        ?? throw new InvalidOperationException(
+            "Falta configurar la dirección de la API de cargas."
+        );
+
+    client.BaseAddress = new Uri(direccion);
+    client.Timeout = TimeSpan.FromMinutes(11);
+});
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 

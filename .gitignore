@@ -35,3 +35,9 @@ crear_carga_trabajo.py
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Archivos temporales y entornos de Python
+__pycache__/
+*.pyc
+.venv/
+venv/

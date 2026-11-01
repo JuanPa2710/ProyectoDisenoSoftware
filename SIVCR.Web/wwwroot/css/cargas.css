@@ -1,0 +1,323 @@
+.cargas {
+    max-width: 1172px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cargas__breadcrumb {
+    margin: 0 0 4px;
+    color: var(--sivcr-text-muted);
+    font-size: 12px;
+}
+
+.cargas h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.cargas__pasos {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 16px;
+    list-style: none;
+    border-radius: 8px;
+    background: var(--sivcr-surface);
+}
+
+.cargas__paso {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    color: var(--sivcr-text-muted);
+    font-size: 12px;
+}
+
+.cargas__paso:not(:last-child)::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    margin-left: 4px;
+    background: var(--sivcr-border);
+}
+
+.cargas__numero {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--sivcr-input-border);
+    border-radius: 50%;
+}
+
+.cargas__paso--activo {
+    color: var(--sivcr-text);
+}
+
+.cargas__paso--activo .cargas__numero {
+    border-color: var(--sivcr-primary);
+    background: var(--sivcr-primary);
+}
+
+.cargas__columnas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+}
+
+.cargas__panel {
+    min-width: 0;
+    padding: 16px;
+    border-radius: 8px;
+    background: var(--sivcr-surface);
+}
+
+.cargas__panel h2 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.cargas__selector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 16px;
+    border: 1px dashed var(--sivcr-input-border);
+    border-radius: 6px;
+    text-align: center;
+}
+
+.cargas__icono {
+    width: 32px;
+    height: 32px;
+    fill: none;
+    stroke: var(--sivcr-accent);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.cargas__selector input[type="file"] {
+    max-width: 100%;
+    color: var(--sivcr-text-soft);
+    font-size: 13px;
+}
+
+.cargas__selector input[type="file"]::file-selector-button {
+    margin-right: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--sivcr-input-border);
+    border-radius: 4px;
+    background: var(--sivcr-surface);
+    color: var(--sivcr-text);
+    cursor: pointer;
+}
+
+.cargas__selector:focus-within {
+    outline: 2px solid var(--sivcr-accent);
+    outline-offset: 3px;
+}
+
+.cargas__ayuda {
+    margin: 0;
+    color: var(--sivcr-text-muted);
+    font-size: 12px;
+}
+
+.cargas__validaciones {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cargas__validacion {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--sivcr-border);
+}
+
+.cargas__validacion:last-child {
+    border-bottom: 0;
+}
+
+.cargas__validacion strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.cargas__estado {
+    flex-shrink: 0;
+    color: var(--sivcr-text-muted);
+    font-size: 12px;
+}
+
+.cargas__acciones {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.cargas button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+    .cargas__columnas {
+        grid-template-columns: 1fr;
+    }
+
+    .cargas__pasos {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .cargas__paso::after {
+        display: none;
+    }
+}
+.cargas__error {
+    padding: 16px;
+    border: 1px solid #a4262c;
+    border-radius: 6px;
+    background: #3b080b;
+    color: #fff;
+}
+
+.cargas__error p {
+    margin: 6px 0 0;
+}
+.cargas__recibido {
+    margin-top: 16px;
+    padding: 12px;
+    border: 1px solid var(--sivcr-border);
+    border-left: 3px solid var(--sivcr-accent);
+    border-radius: 6px;
+    overflow-wrap: anywhere;
+}
+
+.cargas__recibido p {
+    margin: 6px 0 0;
+}
+.cargas__resumen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.cargas__dato {
+    padding: 14px;
+    border: 1px solid var(--sivcr-border);
+    border-radius: 6px;
+}
+
+.cargas__dato span {
+    display: block;
+    color: var(--sivcr-text-soft);
+    font-size: 12px;
+}
+
+.cargas__dato strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 26px;
+    font-weight: 600;
+}
+
+.cargas__tabla-contenedor {
+    overflow-x: auto;
+    margin-bottom: 12px;
+}
+
+.cargas__tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.cargas__tabla caption {
+    caption-side: top;
+    color: var(--sivcr-text-soft);
+}
+
+.cargas__tabla th,
+.cargas__tabla td {
+    padding: 10px;
+    border-bottom: 1px solid var(--sivcr-border);
+    text-align: left;
+}
+
+.cargas__tabla th:last-child,
+.cargas__tabla td:last-child {
+    text-align: right;
+}
+
+.cargas__notas {
+    margin: 12px 0 0;
+    padding-left: 20px;
+    color: var(--sivcr-text-muted);
+    font-size: 12px;
+}
+
+.cargas__notas li + li {
+    margin-top: 6px;
+}
+
+@media (max-width: 480px) {
+    .cargas__resumen {
+        grid-template-columns: 1fr;
+    }
+}
+.cargas__paso--completo {
+    color: var(--sivcr-text-soft);
+}
+
+.cargas__paso--completo .cargas__numero {
+    border-color: var(--sivcr-primary);
+    background: var(--sivcr-primary);
+    color: #fff;
+}
+/* Centrar el texto tanto en enlaces como en botones. */
+.cargas .sivcr-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    text-decoration: none;
+    line-height: 1.2;
+    min-height: 40px;
+}
+
+/* Separar las acciones y permitir que se acomoden en pantallas pequeñas. */
+.cargas__acciones {
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.cargas__cabecera-reporte {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.cargas__cabecera-reporte h2 {
+    margin: 0;
+}

@@ -1,0 +1,340 @@
+@model CargaDatosViewModel
+
+@{
+    ViewData["Title"] = "Carga de datos viales";
+
+    var pasoActual = Model.Importada ? 4
+        : Model.Reporte != null ? 3
+        : !string.IsNullOrWhiteSpace(Model.CargaId) ? 2
+        : 1;
+
+    var pasos = new[]
+    {
+        "Seleccionar archivo",
+        "Validar estructura",
+        "Confirmar importación",
+        "Reporte final"
+    };
+
+    var estadoConversiones = Model.Reporte == null
+        ? "Pendiente"
+        : Model.Reporte.SinAnioOMes == 0
+            && Model.Reporte.SinDiaSemana == 0
+            && Model.Reporte.SinKilometroNumerico == 0
+                ? "Sin faltantes"
+                : "Revisar reporte";
+}
+
+<div class="cargas">
+    <header>
+        <p class="cargas__breadcrumb">
+            Inicio / Administración / Carga de datos
+        </p>
+        <h1>Carga de datos viales</h1>
+    </header>
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="cargas__error" role="alert">
+            <strong>No se pudo completar la carga.</strong>
+            <p>@Model.Error</p>
+        </div>
+    }
+    <ol class="cargas__pasos" aria-label="Etapas de la carga">
+        @for (var i = 0; i < pasos.Length; i++)
+        {
+            var numero = i + 1;
+            var completado = numero < pasoActual;
+            var activo = numero == pasoActual;
+
+            <li class="cargas__paso @(activo ? "cargas__paso--activo" : "") @(completado ? "cargas__paso--completo" : "")"
+                aria-current="@(activo ? "step" : null)">
+                <span class="cargas__numero">
+                    @(completado ? "✓" : numero.ToString())
+                </span>
+                <span>@pasos[i]</span>
+            </li>
+        }
+    </ol>
+    <div class="cargas__columnas">
+        <section class="cargas__panel"
+                 aria-labelledby="titulo-archivo">
+            <h2 id="titulo-archivo">1. Archivo de origen</h2>
+
+            <form asp-controller="Cargas"
+                  asp-action="Subir"
+                  method="post"
+                  enctype="multipart/form-data">
+
+                <div class="cargas__selector">
+                    <svg class="cargas__icono"
+                         viewBox="0 0 24 24"
+                         aria-hidden="true">
+                        <path d="M12 16V3M7 8l5-5 5 5" />
+                        <path d="M4 15v5h16v-5" />
+                    </svg>
+
+                    <label for="archivo">
+                        Seleccioná un archivo de accidentes de COSEVI
+                    </label>
+
+                    <input type="file"
+                           id="archivo"
+                           name="archivo"
+                           accept=".csv,.json,.xlsx"
+                           required
+                           aria-describedby="ayuda-archivo" />
+
+                    <p id="ayuda-archivo" class="cargas__ayuda">
+                        CSV, JSON o Excel (.xlsx) · Máximo 50 MB
+                    </p>
+
+                    <p class="cargas__ayuda">
+    CSV separado por punto y coma; JSON con los mismos campos del perfil.
+</p>
+<p class="cargas__ayuda">
+    Excel: una sola hoja, encabezados en la primera fila y datos
+    debajo, sin fórmulas ni celdas con errores.
+</p>
+                </div>
+
+                <div class="cargas__acciones">
+                    <button type="submit"
+                            class="sivcr-button sivcr-button--primary">
+                        Subir archivo
+                    </button>
+                </div>
+
+                
+            </form>
+            @if (!string.IsNullOrWhiteSpace(Model.CargaId))
+            {
+                <div class="cargas__recibido" role="status">
+                    <strong>Archivo recibido correctamente</strong>
+                    <p>@Model.NombreArchivo</p>
+                                        @if (Model.Reporte == null)
+                    {
+                        <p class="cargas__ayuda">
+                            Pendiente de procesamiento.
+                            Todavía no se ha importado a MongoDB.
+                        </p>
+
+                        <form asp-controller="Cargas"
+                              asp-action="Procesar"
+                              method="post"
+                              class="cargas__acciones">
+                            <input type="hidden"
+                                   name="cargaId"
+                                   value="@Model.CargaId" />
+
+                            <input type="hidden"
+                                   name="nombreArchivo"
+                                   value="@Model.NombreArchivo" />
+
+                            <button type="submit"
+                                    class="sivcr-button sivcr-button--primary">
+                                Procesar archivo
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="cargas__ayuda">
+    @(Model.Importada
+        ? "Importación completada en MongoDB."
+        : "Procesamiento terminado. Reporte disponible. Todavía no se ha importado a MongoDB.")
+</p>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="cargas__panel"
+                 aria-labelledby="titulo-validaciones">
+            <h2 id="titulo-validaciones">2. Validaciones</h2>
+
+            <ul class="cargas__validaciones">
+                <li class="cargas__validacion">
+                    <div>
+                        <strong>Formato y estructura</strong>
+                        <p class="cargas__ayuda">
+                            Lectura del archivo y revisión de columnas.
+                        </p>
+                    </div>
+                    <span class="cargas__estado">
+    @(Model.Reporte == null ? "Pendiente" : "Archivo leído")
+</span>
+                </li>
+
+                <li class="cargas__validacion">
+                    <div>
+                        <strong>Conversiones de datos</strong>
+                        <p class="cargas__ayuda">
+                            Año, mes, día de semana y kilómetro.
+                        </p>
+                    </div>
+<span class="cargas__estado">@estadoConversiones</span>                    
+               </li>
+
+                <li class="cargas__validacion">
+                    <div>
+                        <strong>Campos obligatorios</strong>
+                        <p class="cargas__ayuda">
+                            Las reglas de rechazo aún no están implementadas.
+                        </p>
+                    </div>
+                    <span class="cargas__estado">No disponible</span>
+                </li>
+
+                <li class="cargas__validacion">
+                    <div>
+                        <strong>Coordenadas y fecha exacta</strong>
+                        <p class="cargas__ayuda">
+                            El perfil COSEVI actual no incluye estos datos.
+                        </p>
+                    </div>
+                    <span class="cargas__estado">No aplica</span>
+                </li>
+            </ul>
+        </section>
+    </div>
+
+    <section class="cargas__panel"
+             aria-labelledby="titulo-reporte">
+        <div class="cargas__cabecera-reporte">
+    <h2>3. Reporte de calidad de datos</h2>
+
+    @if (Model.Reporte != null
+        && !string.IsNullOrWhiteSpace(Model.CargaId)
+        && !string.IsNullOrWhiteSpace(Model.CarpetaResultado))
+    {
+        <a asp-controller="Cargas"
+           asp-action="DescargarReporte"
+           asp-route-cargaId="@Model.CargaId"
+           asp-route-carpetaResultado="@Model.CarpetaResultado"
+           class="sivcr-button sivcr-button--secondary">
+            Descargar reporte
+        </a>
+    }
+</div>
+
+                @if (Model.Reporte is { } reporte)
+        {
+            <div class="cargas__resumen">
+                <div class="cargas__dato">
+                    <span>Registros leídos</span>
+                    <strong>@reporte.RegistrosLeidos.ToString("N0")</strong>
+                </div>
+
+                <div class="cargas__dato">
+                    <span>Documentos generados</span>
+                    <strong>@reporte.DocumentosGenerados.ToString("N0")</strong>
+                </div>
+            </div>
+
+            <div class="cargas__tabla-contenedor">
+                <table class="cargas__tabla">
+                    <caption>Resultado de las conversiones</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Comprobación</th>
+                            <th scope="col">Registros</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Sin año o mes numérico</td>
+                            <td>@reporte.SinAnioOMes.ToString("N0")</td>
+                        </tr>
+                        <tr>
+                            <td>Sin día de semana reconocido</td>
+                            <td>@reporte.SinDiaSemana.ToString("N0")</td>
+                        </tr>
+                        <tr>
+                            <td>Sin kilómetro numérico</td>
+                            <td>@reporte.SinKilometroNumerico.ToString("N0")</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="cargas__ayuda">
+                Estos conteos pueden incluir un mismo registro en varias
+                comprobaciones. No equivalen a registros rechazados.
+            </p>
+
+            <ul class="cargas__notas">
+                @foreach (var nota in reporte.Notas)
+                {
+                    <li>@nota</li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="cargas__ayuda">
+                El resumen del procesamiento aparecerá aquí cuando
+                se analice un archivo.
+            </p>
+        }
+    </section>
+@if (Model.Reporte != null)
+{
+    if (Model.Importada)
+    {
+        <section class="cargas__panel" role="status">
+            <h2>Importación completada</h2>
+            <p>
+                Los documentos y el historial de esta carga
+                se guardaron en MongoDB.
+            </p>
+            <p class="cargas__ayuda">
+                Identificador de carga: @Model.CargaId
+            </p>
+            <div class="cargas__acciones">
+                <a asp-controller="Cargas" asp-action="Index"
+                   class="sivcr-button sivcr-button--secondary">
+                    Cargar otro archivo
+                </a>
+                <a asp-controller="Home" asp-action="Index"
+                   class="sivcr-button sivcr-button--primary">
+                    Ir al dashboard
+                </a>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="cargas__panel">
+            <h2>Confirmar importación</h2>
+            <p>
+                Se importarán
+                @Model.Reporte.DocumentosGenerados.ToString("N0")
+                documentos. Revisá el reporte antes de continuar.
+            </p>
+            <p class="cargas__ayuda">
+                Las comprobaciones actuales informan sobre conversiones;
+                todavía no excluyen registros mediante reglas de rechazo.
+            </p>
+
+            <form asp-controller="Cargas" asp-action="Importar"
+                  method="post" class="cargas__acciones">
+                <input type="hidden" name="cargaId"
+                       value="@Model.CargaId" />
+                <input type="hidden" name="carpetaResultado"
+                       value="@Model.CarpetaResultado" />
+                <input type="hidden" name="nombreArchivo"
+                       value="@Model.NombreArchivo" />
+
+                <a asp-controller="Cargas" asp-action="Index"
+                   class="sivcr-button sivcr-button--secondary">
+                    Volver al inicio
+                </a>
+                <button type="submit"
+                        class="sivcr-button sivcr-button--primary">
+                    Confirmar importación
+                </button>
+            </form>
+        </section>
+    }
+}
+</div>

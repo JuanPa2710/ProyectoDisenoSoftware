@@ -2,6 +2,11 @@
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
     var isHomeController = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
+    var isCargasController = string.Equals(
+        currentController,
+        "Cargas",
+        StringComparison.OrdinalIgnoreCase
+    );
 }
 <!DOCTYPE html>
 <html lang="es">
@@ -14,6 +19,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (isCargasController)
+    {
+        <link rel="stylesheet"
+              href="~/css/cargas.css"
+              asp-append-version="true" />
+    }
     <link rel="stylesheet" href="~/SIVCR.Web.styles.css" asp-append-version="true" />
 </head>
 <body class="sivcr-shell">
@@ -78,7 +89,10 @@
 
             <div class="sivcr-sidebar__section-title sivcr-sidebar__section-title--spaced">Administración</div>
 
-            <a class="sivcr-nav-item" href="#" aria-disabled="true">
+            <a class="sivcr-nav-item @(isCargasController ? "sivcr-nav-item--active" : "")"
+   asp-controller="Cargas"
+   asp-action="Index"
+   aria-current="@(isCargasController ? "page" : null)">
                 <svg class="sivcr-nav-item__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                     <path d="M10 13V3M6.5 6.5 10 3l3.5 3.5M3 11.5V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4.5" />
                 </svg>
