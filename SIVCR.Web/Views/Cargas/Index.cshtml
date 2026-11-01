@@ -177,12 +177,17 @@
 
                 <li class="cargas__validacion">
                     <div>
-                        <strong>Campos obligatorios</strong>
+                        <strong>Validación de registros</strong>
                         <p class="cargas__ayuda">
-                            Las reglas de rechazo aún no están implementadas.
+                            Año, mes, día de semana, provincia,
+                            clase y tipo de accidente.
                         </p>
                     </div>
-                    <span class="cargas__estado">No disponible</span>
+                    <span class="cargas__estado">
+                        @(Model.Reporte == null
+                            ? "Pendiente"
+                            : $"{Model.Reporte.RegistrosRechazados:N0} rechazados")
+                    </span>
                 </li>
 
                 <li class="cargas__validacion">
@@ -226,10 +231,49 @@
                 </div>
 
                 <div class="cargas__dato">
-                    <span>Documentos generados</span>
-                    <strong>@reporte.DocumentosGenerados.ToString("N0")</strong>
+                    <span>Aceptados</span>
+                    <strong>@reporte.RegistrosAceptados.ToString("N0")</strong>
+                </div>
+
+                <div class="cargas__dato">
+                    <span>Rechazados</span>
+                    <strong>@reporte.RegistrosRechazados.ToString("N0")</strong>
                 </div>
             </div>
+
+            @if (reporte.RegistrosRechazados > 0)
+            {
+                <div class="cargas__tabla-contenedor">
+                    <table class="cargas__tabla">
+                        <caption>Primer fallo de los registros rechazados</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Campo</th>
+                                <th scope="col">Valor</th>
+                                <th scope="col">Problema</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var error in reporte.MuestraErrores)
+                            {
+                                <tr>
+                                    <td>@error.Campo</td>
+                                    <td>@(string.IsNullOrWhiteSpace(error.Valor)
+                                        ? "(vacío)" : error.Valor)</td>
+                                    <td>@error.Problema</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="cargas__ayuda">
+                    Mostrando @reporte.MuestraErrores.Count de
+                    @reporte.RegistrosRechazados.ToString("N0") registros rechazados.
+                    Cada registro informa únicamente su primer fallo.
+                    El reporte descargable incluye esta muestra y los conteos.
+                </p>
+            }
 
             <div class="cargas__tabla-contenedor">
                 <table class="cargas__tabla">
@@ -302,18 +346,35 @@
             </div>
         </section>
     }
+    else if (!Model.Reporte.PuedeImportar
+        || Model.Reporte.RegistrosAceptados <= 0)
+    {
+        <section class="cargas__panel" role="status">
+            <h2>No hay registros válidos para importar</h2>
+            <p>
+                Revisá los errores del reporte y corregí el archivo.
+                No se ha realizado ninguna importación de esta carga.
+            </p>
+            <div class="cargas__acciones">
+                <a asp-controller="Cargas" asp-action="Index"
+                   class="sivcr-button sivcr-button--secondary">
+                    Seleccionar otro archivo
+                </a>
+            </div>
+        </section>
+    }
     else
     {
         <section class="cargas__panel">
             <h2>Confirmar importación</h2>
             <p>
                 Se importarán
-                @Model.Reporte.DocumentosGenerados.ToString("N0")
+                @Model.Reporte.RegistrosAceptados.ToString("N0")
                 documentos. Revisá el reporte antes de continuar.
             </p>
             <p class="cargas__ayuda">
-                Las comprobaciones actuales informan sobre conversiones;
-                todavía no excluyen registros mediante reglas de rechazo.
+                Los @Model.Reporte.RegistrosRechazados.ToString("N0")
+                registros rechazados quedarán excluidos de la importación.
             </p>
 
             <form asp-controller="Cargas" asp-action="Importar"

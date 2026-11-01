@@ -440,6 +440,59 @@ public sealed class CargaDatosService
             );
         }
 
+        // Leer el reporte del servidor antes de iniciar la importación.
+        JsonElement reporte;
+
+        try
+        {
+            reporte = await LeerReporteAsync(
+                cargaId, carpetaResultado, cancellationToken);
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException(
+                "El reporte de validación no se pudo interpretar.");
+        }
+
+        if (reporte.ValueKind != JsonValueKind.Object
+            || !reporte.TryGetProperty("registros_leidos", out var leidosJson)
+            || leidosJson.ValueKind != JsonValueKind.Number
+            || !leidosJson.TryGetInt64(out var leidos)
+            || !reporte.TryGetProperty("registros_aceptados", out var aceptadosJson)
+            || aceptadosJson.ValueKind != JsonValueKind.Number
+            || !aceptadosJson.TryGetInt64(out var aceptados)
+            || !reporte.TryGetProperty("registros_rechazados", out var rechazadosJson)
+            || rechazadosJson.ValueKind != JsonValueKind.Number
+            || !rechazadosJson.TryGetInt64(out var rechazados)
+            || !reporte.TryGetProperty("documentos_generados", out var generadosJson)
+            || generadosJson.ValueKind != JsonValueKind.Number
+            || !generadosJson.TryGetInt64(out var generados)
+            || !reporte.TryGetProperty("puede_importar", out var puedeJson)
+            || (puedeJson.ValueKind != JsonValueKind.True
+                && puedeJson.ValueKind != JsonValueKind.False))
+        {
+            throw new ArgumentException(
+                "Volvé a procesar el archivo para generar un reporte de validación actualizado.");
+        }
+
+        if (leidos < 0
+            || aceptados < 0
+            || rechazados < 0
+            || aceptados > leidos
+            || leidos - aceptados != rechazados
+            || generados != aceptados
+            || puedeJson.GetBoolean() != (aceptados > 0))
+        {
+            throw new ArgumentException(
+                "Los conteos del reporte no son consistentes. Volvé a procesar el archivo.");
+        }
+
+        if (aceptados == 0)
+        {
+            throw new ArgumentException(
+                "No hay registros válidos para importar. Revisá el reporte y corregí el archivo.");
+        }
+
         if (string.IsNullOrEmpty(
             Environment.GetEnvironmentVariable("SIVCR_MONGO_PASSWORD")))
         {

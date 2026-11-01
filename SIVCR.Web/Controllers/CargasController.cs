@@ -292,6 +292,26 @@ public sealed class CargasController : Controller
                 return View("Index", modelo);
             }
 
+            if (!modelo.Reporte.PuedeImportar
+                || modelo.Reporte.RegistrosAceptados <= 0)
+            {
+                modelo.Error =
+                    "No hay registros válidos para importar. "
+                    + "Revisá el reporte y corregí el archivo.";
+
+                return View("Index", modelo);
+            }
+
+            if (modelo.Reporte.DocumentosGenerados
+                != modelo.Reporte.RegistrosAceptados)
+            {
+                modelo.Error =
+                    "El reporte presenta conteos inconsistentes. "
+                    + "Volvé a procesar el archivo.";
+
+                return View("Index", modelo);
+            }
+
             using var respuesta = await cliente.PostAsync(
                 ruta + "/importar" + consulta, null, cancellationToken);
 

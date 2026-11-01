@@ -32,6 +32,33 @@ public sealed class ReporteCargaViewModel
     [JsonPropertyName("registros_sin_kilometro_numerico")]
     public long SinKilometroNumerico { get; set; }
 
+    [JsonPropertyName("registros_aceptados")]
+    public long RegistrosAceptados { get; set; }
+
+    [JsonPropertyName("registros_rechazados")]
+    public long RegistrosRechazados { get; set; }
+
+    [JsonPropertyName("puede_importar")]
+    public bool PuedeImportar { get; set; }
+
+    [JsonPropertyName("errores_por_campo")]
+    public Dictionary<string, long> ErroresPorCampo { get; set; } = [];
+
+    [JsonPropertyName("muestra_errores")]
+    public List<ErrorCargaViewModel> MuestraErrores { get; set; } = [];
+
     [JsonPropertyName("notas")]
     public string[] Notas { get; set; } = [];
+}
+
+public sealed class ErrorCargaViewModel
+{
+    [JsonPropertyName("campo")]
+    public string Campo { get; set; } = "";
+
+    [JsonPropertyName("valor")]
+    public string? Valor { get; set; }
+
+    [JsonPropertyName("problema")]
+    public string Problema { get; set; } = "";
 }

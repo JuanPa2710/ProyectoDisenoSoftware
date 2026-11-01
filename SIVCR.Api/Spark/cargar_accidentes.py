@@ -391,8 +391,106 @@ try:
         ).count()
     )
 
+    # Validaciones ordenadas: conservar solo el primer fallo.
+    from datetime import datetime
+
+    anio_actual = datetime.now().year
+
+    def fallo(condicion, campo, mensaje):
+        return F.when(
+            condicion,
+            F.struct(
+                F.lit(campo).alias("campo"),
+                F.col(campo).cast("string").alias("valor"),
+                F.lit(mensaje).alias("problema")
+            )
+        )
+
+    def esta_vacio(campo):
+        return (
+            F.col(campo).isNull()
+            | (F.trim(F.col(campo)) == "")
+        )
+
+    provincias_validas = [
+        "san josé",
+        "alajuela",
+        "cartago",
+        "heredia",
+        "guanacaste",
+        "puntarenas",
+        "limón",
+    ]
+
+    datos = datos.withColumn(
+        "primer_error",
+        F.coalesce(
+            fallo(
+                F.col("anio").isNull()
+                | ~F.col("anio").between(1900, anio_actual),
+                "Año",
+                f"Debe ser un año entero entre 1900 y {anio_actual}."
+            ),
+            fallo(
+                F.col("mes_numero").isNull(),
+                "Mes",
+                "El mes no pertenece al catálogo del perfil."
+            ),
+            fallo(
+                F.col("dia_semana_numero").isNull(),
+                "Día",
+                "El día de la semana no pertenece al catálogo."
+            ),
+            fallo(
+                esta_vacio("Provincia")
+                | ~F.lower(F.col("Provincia")).isin(provincias_validas),
+                "Provincia",
+                "Debe indicar una de las siete provincias de Costa Rica."
+            ),
+            fallo(
+                esta_vacio("Clase de accidente"),
+                "Clase de accidente",
+                "La clase de accidente es obligatoria."
+            ),
+            fallo(
+                esta_vacio("Tipo de accidente"),
+                "Tipo de accidente",
+                "El tipo de accidente es obligatorio."
+            )
+        )
+    )
+
+    print("\nRESUMEN DE VALIDACIÓN POR REGISTRO:")
+    datos.select(
+        F.when(
+            F.col("primer_error").isNull(),
+            F.lit("Válido")
+        ).otherwise(F.lit("Rechazado")).alias("resultado")
+    ).groupBy("resultado").count().show(truncate=False)
+
+    print("\nPRIMER FALLO DE LOS REGISTROS RECHAZADOS:")
+    datos.filter(
+        F.col("primer_error").isNotNull()
+    ).select(
+        "primer_error.campo",
+        "primer_error.valor",
+        "primer_error.problema"
+    ).show(20, truncate=False)
+
+    # Separar los registros sin modificar el conjunto original.
+    validos = datos.filter(F.col("primer_error").isNull())
+    rechazados = datos.filter(F.col("primer_error").isNotNull())
+
+    total_leidos = datos.count()
+    total_aceptados = validos.count()
+    total_rechazados = rechazados.count()
+
+    if total_leidos != total_aceptados + total_rechazados:
+        raise RuntimeError("Los conteos de validación no coinciden.")
+
+
     # Organizar los datos en documentos con campos agrupados.
-    documentos = datos.select(
+    documentos = validos.select(
         F.lit("COSEVI").alias("fuente"),
 
         F.col("Clase de accidente").alias("clase_accidente"),
@@ -429,17 +527,25 @@ try:
         F.col("Hora recodificada").alias("franja_horaria")
     )
 
-    print("\nEJEMPLO DE DOCUMENTO JSON:")
-    ejemplo = documentos.limit(1).toJSON(
-        use_unicode=True
-    ).first()
-
     import json
-    print(json.dumps(json.loads(ejemplo), indent=2, ensure_ascii=False))
-
-    # Crear una carpeta distinta para cada ejecución.
     from datetime import datetime
 
+    # Mostrar un ejemplo solo si existe algún documento válido.
+    print("\nEJEMPLO DE DOCUMENTO JSON:")
+    ejemplos = documentos.limit(1).toJSON(
+        use_unicode=True
+    ).collect()
+
+    if ejemplos:
+        print(json.dumps(
+            json.loads(ejemplos[0]),
+            indent=2,
+            ensure_ascii=False
+        ))
+    else:
+        print("No hay registros válidos para importar.")
+
+    # Crear una carpeta distinta para cada ejecución.
     if argumentos.salida is not None:
         salida = str(argumentos.salida.expanduser().resolve())
     else:
@@ -448,7 +554,7 @@ try:
             Path.home() / "apps/datos/procesados" / nombre_carga
         )
 
-    # Guardar los documentos, conservando explícitamente los null.
+    # En la raíz se guardan únicamente documentos válidos.
     (
         documentos.write
         .mode("errorifexists")
@@ -456,12 +562,64 @@ try:
         .json(salida)
     )
 
-    print("\nDOCUMENTOS GUARDADOS EN:", salida)
+    # Usar el esquema conocido permite comprobar también una salida vacía.
+    guardados = (
+        spark.read
+        .schema(documentos.schema)
+        .json(str(Path(salida) / "part-*.json"))
+        .count()
+    )
 
-    # Leer la salida para comprobar cuántos documentos se guardaron.
-    guardados = spark.read.json(salida).count()
-    print("TOTAL GUARDADO:", guardados)
-    # Resumen del procesamiento para que la API pueda consultarlo.
+    if guardados != total_aceptados:
+        raise RuntimeError(
+            "La cantidad guardada no coincide con los registros aceptados."
+        )
+
+    # Conservar cada registro rechazado junto con su primer fallo.
+    detalle_rechazados = rechazados.select(
+        F.col("primer_error.campo").alias("campo"),
+        F.col("primer_error.valor").alias("valor"),
+        F.col("primer_error.problema").alias("problema"),
+        F.struct(
+            *[F.col(nombre) for nombre in columnas_requeridas]
+        ).alias("registro_original")
+    )
+
+    carpeta_rechazados = Path(salida) / "rechazados"
+
+    if total_rechazados > 0:
+        (
+            detalle_rechazados.write
+            .mode("errorifexists")
+            .option("ignoreNullFields", "false")
+            .json(str(carpeta_rechazados))
+        )
+
+    # Resumen por primer campo que falló.
+    errores_por_campo = {
+        fila["campo"]: fila["count"]
+        for fila in (
+            detalle_rechazados
+            .groupBy("campo")
+            .count()
+            .collect()
+        )
+    }
+
+    # Una muestra pequeña para mostrar posteriormente en la pantalla.
+    muestra_errores = [
+        fila.asDict()
+        for fila in (
+            detalle_rechazados
+            .select("campo", "valor", "problema")
+            .orderBy("campo", "valor", "problema")
+            .limit(20)
+            .collect()
+        )
+    ]
+
+    # Estos indicadores describen conversiones sobre todos los registros.
+    # Pueden superponerse; no son el total de rechazos.
     sin_anio_mes = datos.filter(
         F.col("anio").isNull()
         | F.col("mes_numero").isNull()
@@ -477,15 +635,25 @@ try:
 
     reporte = {
         "perfil": "accidentes_cosevi",
-        "registros_leidos": datos.count(),
+        "registros_leidos": total_leidos,
+        "registros_aceptados": total_aceptados,
+        "registros_rechazados": total_rechazados,
         "documentos_generados": guardados,
+        "puede_importar": total_aceptados > 0,
         "registros_sin_anio_o_mes": sin_anio_mes,
         "registros_sin_dia_semana": sin_dia,
         "registros_sin_kilometro_numerico": sin_kilometro,
+        "errores_por_campo": errores_por_campo,
+        "muestra_errores": muestra_errores,
+        "carpeta_rechazados": (
+            "rechazados" if total_rechazados > 0 else None
+        ),
         "notas": [
+            "Cada registro rechazado informa únicamente su primer fallo.",
+            "Solo los registros aceptados generan documentos importables.",
             "El día representa el día de la semana, no el día del mes.",
             "Un kilómetro no numérico no implica descartar el accidente.",
-            "Este reporte todavía no aplica reglas de rechazo."
+            "Los indicadores de conversión pueden incluir un mismo registro."
         ]
     }
 
@@ -495,7 +663,13 @@ try:
         encoding="utf-8"
     )
 
+    print("\nRESUMEN FINAL:")
+    print("REGISTROS LEÍDOS:", total_leidos)
+    print("REGISTROS ACEPTADOS:", total_aceptados)
+    print("REGISTROS RECHAZADOS:", total_rechazados)
+    print("DOCUMENTOS GUARDADOS:", guardados)
     print("REPORTE GUARDADO EN:", ruta_reporte)
+
 finally:
     try:
         spark.stop()
