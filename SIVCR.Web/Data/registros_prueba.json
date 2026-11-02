@@ -10,7 +10,7 @@
     "Franja": "Matutina",
     "Clima": "Lluvioso",
     "Calzada": "Húmeda",
-    "Tpr": "Alto",
+    "Tpr": "18 min",
     "Severidad": "Grave"
   },
   {
@@ -24,7 +24,7 @@
     "Franja": "Matutina",
     "Clima": "Nublado",
     "Calzada": "Seca",
-    "Tpr": "Medio",
+    "Tpr": "12 min",
     "Severidad": "Leve"
   },
   {
@@ -38,7 +38,7 @@
     "Franja": "Tarde",
     "Clima": "Despejado",
     "Calzada": "Seca",
-    "Tpr": "Alto",
+    "Tpr": "22 min",
     "Severidad": "Fallecidos"
   },
   {
@@ -52,7 +52,7 @@
     "Franja": "Tarde",
     "Clima": "Nublado",
     "Calzada": "Seca",
-    "Tpr": "Medio",
+    "Tpr": "16 min",
     "Severidad": "Materiales"
   },
   {
@@ -66,7 +66,7 @@
     "Franja": "Matutina",
     "Clima": "Lluvioso",
     "Calzada": "Húmeda",
-    "Tpr": "Alto",
+    "Tpr": "25 min",
     "Severidad": "Grave"
   },
   {
@@ -80,7 +80,7 @@
     "Franja": "Mediodía",
     "Clima": "Despejado",
     "Calzada": "Seca",
-    "Tpr": "Bajo",
+    "Tpr": "9 min",
     "Severidad": "Leve"
   },
   {
@@ -94,7 +94,7 @@
     "Franja": "Noche",
     "Clima": "Lluvioso",
     "Calzada": "Húmeda",
-    "Tpr": "Alto",
+    "Tpr": "21 min",
     "Severidad": "Fallecidos"
   },
   {
@@ -108,7 +108,7 @@
     "Franja": "Noche",
     "Clima": "Despejado",
     "Calzada": "Seca",
-    "Tpr": "Medio",
+    "Tpr": "14 min",
     "Severidad": "Grave"
   },
   {
@@ -122,7 +122,7 @@
     "Franja": "Matutina",
     "Clima": "Nublado",
     "Calzada": "Seca",
-    "Tpr": "Bajo",
+    "Tpr": "8 min",
     "Severidad": "Materiales"
   },
   {
@@ -136,7 +136,7 @@
     "Franja": "Tarde",
     "Clima": "Lluvioso",
     "Calzada": "Húmeda",
-    "Tpr": "Medio",
+    "Tpr": "15 min",
     "Severidad": "Leve"
   },
   {
@@ -150,7 +150,7 @@
     "Franja": "Tarde",
     "Clima": "Despejado",
     "Calzada": "Seca",
-    "Tpr": "Bajo",
+    "Tpr": "10 min",
     "Severidad": "Materiales"
   },
   {
@@ -164,7 +164,7 @@
     "Franja": "Matutina",
     "Clima": "Nublado",
     "Calzada": "Seca",
-    "Tpr": "Alto",
+    "Tpr": "20 min",
     "Severidad": "Grave"
   }
 ]

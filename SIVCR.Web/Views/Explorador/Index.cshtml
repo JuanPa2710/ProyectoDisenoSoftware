@@ -230,13 +230,15 @@
      tabindex="-1"
      aria-labelledby="exportacion_titulo"
      aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered explorador_modal_sin_exportacion">
+     <div class="modal-dialog modal-dialog-centered explorador_modal">
         <div class="modal-content">
             <header class="explorador_modal_encabezado">
-                <h2 id="exportacion_titulo">Exportar consulta</h2>
-                <button type="button"
-                        class="explorador_modal_cerrar"
-                        data-bs-dismiss="modal"
+                 <div>
+                     <h2 id="exportacion_titulo">Exportar consulta</h2>
+                 </div>
+                 <button type="button"
+                         class="explorador_modal_cerrar"
+                         data-bs-dismiss="modal"
                         aria-label="Cerrar">
                     <svg viewBox="0 0 20 20"
                          aria-hidden="true">
@@ -245,7 +247,9 @@
                 </button>
             </header>
 
-            <div class="explorador_modal_aviso">
+            <div id="exportacion_sin_resultados"
+                 class="explorador_modal_aviso"
+                 hidden>
                 <svg viewBox="0 0 20 20"
                      aria-hidden="true">
                     <path d="M10 2.5 18 17H2L10 2.5Z" />
@@ -254,9 +258,68 @@
 
                 <div>
                     <strong>No hay registros para exportar</strong>
-                    <p>La consulta actual no contiene resultados.</p>
                 </div>
             </div>
+
+            <div id="exportacion_con_resultados">
+                <p class="explorador_modal_detalle">
+                    Se exportarán <strong id="cantidad_exportar">0 registros</strong>.
+                </p>
+
+                <fieldset class="explorador_modal_formatos">
+                    <legend>Formato</legend>
+
+                    <label>
+                        <input type="radio"
+                               name="formato_exportacion"
+                               value="csv"
+                               checked />
+                        <span>
+                            <strong>CSV</strong>
+                        </span>
+                    </label>
+
+                    <label>
+                        <input type="radio"
+                               name="formato_exportacion"
+                               value="excel" />
+                        <span>
+                            <strong>Excel (.xlsx)</strong>
+                        </span>
+                    </label>
+
+                    <label>
+                        <input type="radio"
+                               name="formato_exportacion"
+                               value="pdf" />
+                        <span>
+                            <strong>PDF</strong>
+                        </span>
+                    </label>
+                </fieldset>
+            </div>
+
+            <div id="exportacion_completada"
+                 class="explorador_modal_completado"
+                 role="status"
+                 hidden>
+                <strong>Exportación iniciada</strong>
+                <p>El archivo comenzará a descargarse.</p>
+            </div>
+
+            <footer class="explorador_modal_acciones">
+                <button type="button"
+                        class="sivcr-button sivcr-button--secondary"
+                        data-bs-dismiss="modal">
+                    Cancelar
+                </button>
+
+                <button id="confirmar_exportacion"
+                        type="button"
+                        class="sivcr-button sivcr-button--primary">
+                    Exportar
+                </button>
+            </footer>
         </div>
     </div>
 </div>
@@ -267,6 +330,10 @@
 </script>
 
 @section Scripts {
+    <script src="~/lib/jspdf/jspdf.umd.min.js"
+            asp-append-version="true"></script>
+    <script src="~/js/explorador-pdf.js"
+            asp-append-version="true"></script>
     <script src="~/js/explorador.js"
             asp-append-version="true"></script>
 }

@@ -7,7 +7,7 @@
     let ordenCampo = "Fecha";
     let ascendente = false;
     let pagina = 1;
-    const porPagina = 8;
+    const porPagina = 10;
 
     const filas = document.getElementById("filas_registros");
     const totalConsulta = document.getElementById("total_consulta");
@@ -96,6 +96,8 @@
             numeros.appendChild(boton);
         }
 
+        document.getElementById("cantidad_exportar").textContent =
+            `${filtrados.length} registro${filtrados.length === 1 ? "" : "s"}`;
     }
 
     // para ordenar la tabla
@@ -139,17 +141,71 @@
         });
     });
 
-    // controles de avance y retroceso entre páginas.
+    // controles de avance y retroceso entre páginas
     anterior.addEventListener("click", () => { pagina--; renderizar(); });
     siguiente.addEventListener("click", () => { pagina++; renderizar(); });
     document.getElementById("reintentar").addEventListener("click", iniciarCarga);
 
-    // Cuando no existen resultados, el botón informa que no hay datos para exportar.
+    // abre las opciones o el aviso según los resultados de la consulta
     document.getElementById("abrir_exportacion").addEventListener("click", () => {
-        if (filtrados.length !== 0) return;
+        const vacio = filtrados.length === 0;
+        document.getElementById("exportacion_sin_resultados").hidden = !vacio;
+        document.getElementById("exportacion_con_resultados").hidden = vacio;
+        document.getElementById("exportacion_completada").hidden = true;
+        document.getElementById("confirmar_exportacion").hidden = vacio;
+
         bootstrap.Modal.getOrCreateInstance(
             document.getElementById("dialogo_exportacion")
         ).show();
+    });
+
+    function descargarCsv(separador, extension) {
+        const encabezados = [
+            "ID", "Fecha", "Hora", "Provincia", "Cantón", "Ruta", "Vehículo",
+            "Franja", "Clima", "Calzada", "TPR", "Severidad"
+        ];
+        const campos = [
+            "Id", "Fecha", "Hora", "Provincia", "Canton", "Ruta", "Vehiculo",
+            "Franja", "Clima", "Calzada", "Tpr", "Severidad"
+        ];
+        const filasCsv = filtrados.map((registro) =>
+            campos.map((campo) =>
+                `"${String(registro[campo] ?? "").replaceAll('"', '""')}"`
+            ).join(separador)
+        );
+        const contenidoCsv =
+            "\ufeff" + encabezados.join(separador) + "\n"
+            + filasCsv.join("\n");
+        const tipo = extension === "xls"
+            ? "application/vnd.ms-excel;charset=utf-8"
+            : "text/csv;charset=utf-8";
+        const blob = new Blob([contenidoCsv], { type: tipo });
+        const enlace = document.createElement("a");
+        enlace.href = URL.createObjectURL(blob);
+        enlace.download = `consulta-incidentes.${extension}`;
+        enlace.style.display = "none";
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        window.setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
+    }
+
+    // exporta todos los resultados filtrados
+    document.getElementById("confirmar_exportacion").addEventListener("click", () => {
+        const formato = document.querySelector(
+            'input[name="formato_exportacion"]:checked'
+        ).value;
+
+        if (formato === "csv") descargarCsv(",", "csv");
+        if (formato === "excel") descargarCsv(";", "xls");
+
+        if (formato === "pdf") {
+            window.exportarConsultaPdf(filtrados);
+        }
+
+        document.getElementById("exportacion_con_resultados").hidden = true;
+        document.getElementById("confirmar_exportacion").hidden = true;
+        document.getElementById("exportacion_completada").hidden = false;
     });
 
     function iniciarCarga() {
