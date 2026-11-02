@@ -144,6 +144,17 @@ public sealed class CargasController : Controller
                 cancellationToken
             );
 
+            if (respuesta.StatusCode == System.Net.HttpStatusCode.Conflict)
+{
+    modelo.Error =
+        "Esta carga ya se está procesando o importando. "
+        + "Esperá a que termine la operación que iniciaste "
+        + "en la otra pestaña antes de continuar.";
+
+    modelo.ErrorValidacionArchivo = false;
+    return View("Index", modelo);
+}
+
             if (!respuesta.IsSuccessStatusCode)
             {
                 modelo.Error =
@@ -317,6 +328,17 @@ public sealed class CargasController : Controller
 
             using var respuesta = await cliente.PostAsync(
                 ruta + "/importar" + consulta, null, cancellationToken);
+
+            if (respuesta.StatusCode == System.Net.HttpStatusCode.Conflict)
+{
+    modelo.Error =
+        "Esta carga ya se está procesando o importando. "
+        + "Esperá a que termine la operación que iniciaste "
+        + "en la otra pestaña antes de continuar.";
+
+    modelo.ErrorValidacionArchivo = false;
+    return View("Index", modelo);
+}
 
             if (!respuesta.IsSuccessStatusCode)
             {
