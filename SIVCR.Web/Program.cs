@@ -8,12 +8,32 @@ var cargarDatos = builder.Configuration.GetValue<bool>(
 );
 
 // coneccion a Mongo
-// crea el cliente solo cuando la carga real está activa
+// crea el cliente
 if (cargarDatos) {
     var mongoConfiguration = builder.Configuration.GetSection("MongoDB");
     var mongoPassword = Environment.GetEnvironmentVariable(
         "SIVCR_MONGO_PASSWORD"
     );
+
+    var modoConexion = Environment.GetEnvironmentVariable(
+        "SIVCR_MONGO_MODE"
+    ) ?? mongoConfiguration["ModoConexion"] ?? "TUNNEL";
+    modoConexion = modoConexion.Trim().ToUpperInvariant();
+
+    var hostMongoDB = modoConexion switch {
+        "VM" => mongoConfiguration["HostVM"],
+        "TUNNEL" => mongoConfiguration["HostTunnel"],
+        _ => throw new InvalidOperationException(
+            "SIVCR_MONGO_MODE debe ser VM o TUNNEL."
+        )
+    };
+    var puertoMongoDB = modoConexion switch {
+        "VM" => mongoConfiguration.GetValue<int>("PortVM"),
+        "TUNNEL" => mongoConfiguration.GetValue<int>("PortTunnel"),
+        _ => throw new InvalidOperationException(
+            "SIVCR_MONGO_MODE debe ser VM o TUNNEL."
+        )
+    };
 
     if (string.IsNullOrWhiteSpace(mongoPassword)) {
         throw new InvalidOperationException(
@@ -29,8 +49,8 @@ if (cargarDatos) {
 
     var mongoSettings = new MongoClientSettings {
         Server = new MongoServerAddress(
-            mongoConfiguration["Host"]!,
-            int.Parse(mongoConfiguration["Port"]!)
+            hostMongoDB!,
+            puertoMongoDB
         ),
         Credential = mongoCredentials,
         ServerSelectionTimeout = TimeSpan.FromSeconds(5)

@@ -190,7 +190,7 @@
         window.setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
     }
 
-    // exporta todos los resultados filtrados
+
     // coneccion a Mongo
     // solicita al servidor todos los registros para exportarlos
     async function obtenerDatosExportacion() {
