@@ -33,6 +33,13 @@
         </p>
         <h1>Carga de datos viales</h1>
     </header>
+<div id="cargas-espera"
+     class="cargas__recibido"
+     role="status"
+     aria-live="polite"
+     aria-atomic="true"
+     hidden>
+</div>
     @if (!string.IsNullOrWhiteSpace(Model.Error))
     {
         <div class="cargas__error" role="alert">
@@ -63,9 +70,10 @@
             <h2 id="titulo-archivo">1. Archivo de origen</h2>
 
             <form asp-controller="Cargas"
-                  asp-action="Subir"
-                  method="post"
-                  enctype="multipart/form-data">
+      asp-action="Subir"
+      method="post"
+      enctype="multipart/form-data"
+      data-carga-accion="subir">
 
                 <div class="cargas__selector">
                     <svg class="cargas__icono"
@@ -135,9 +143,10 @@
                         </p>
 
                         <form asp-controller="Cargas"
-                              asp-action="Procesar"
-                              method="post"
-                              class="cargas__acciones">
+      asp-action="Procesar"
+      method="post"
+      class="cargas__acciones"
+      data-carga-accion="procesar">
                             <input type="hidden"
                                    name="cargaId"
                                    value="@Model.CargaId" />
@@ -405,8 +414,11 @@
                 registros rechazados quedarán excluidos de la importación.
             </p>
 
-            <form asp-controller="Cargas" asp-action="Importar"
-                  method="post" class="cargas__acciones">
+            <form asp-controller="Cargas"
+      asp-action="Importar"
+      method="post"
+      class="cargas__acciones"
+      data-carga-accion="importar">
                 <input type="hidden" name="cargaId"
                        value="@Model.CargaId" />
                 <input type="hidden" name="carpetaResultado"
@@ -427,3 +439,6 @@
     }
 }
 </div>
+@section Scripts {
+    <script src="~/js/cargas.js" asp-append-version="true"></script>
+}

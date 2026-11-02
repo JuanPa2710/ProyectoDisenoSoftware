@@ -330,3 +330,7 @@
     border: 1px solid #ff5969;
     color: #ffffff;
 }
+.cargas button[type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
