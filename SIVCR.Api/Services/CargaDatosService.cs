@@ -164,6 +164,8 @@ public sealed class CargaDatosService
         if (!Guid.TryParseExact(cargaId, "N", out var identificador))
             throw new ArgumentException("Identificador de carga inválido.");
 
+        using var bloqueo = BloqueoCarga.Adquirir(identificador);
+
         var carpeta = Path.Combine(
             _options.DataDirectory,
             "cargas",
@@ -411,6 +413,8 @@ public sealed class CargaDatosService
     {
         if (!Guid.TryParseExact(cargaId, "N", out var id))
             throw new ArgumentException("Identificador de carga inválido.");
+
+        using var bloqueo = BloqueoCarga.Adquirir(id);
 
         const string prefijo = "resultado-";
 

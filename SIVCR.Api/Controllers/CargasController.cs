@@ -68,6 +68,11 @@ public sealed class CargasController : ControllerBase
                 mensaje = "JSON generados. Pendiente de importar a MongoDB."
             });
         }
+
+        catch (CargaEnCursoException error)
+{
+    return Conflict(new { mensaje = error.Message });
+}
         catch (ArgumentException error)
         {
             return BadRequest(new { mensaje = error.Message });
@@ -112,6 +117,11 @@ public sealed class CargasController : ControllerBase
                 mensaje = "Documentos e historial guardados en MongoDB."
             });
         }
+
+        catch (CargaEnCursoException error)
+{
+    return Conflict(new { mensaje = error.Message });
+}
         catch (ArgumentException error)
         {
             return BadRequest(new { mensaje = error.Message });
