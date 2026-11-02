@@ -419,4 +419,105 @@ public sealed class CargasController : Controller
             return StatusCode(502, "La API devolvió un reporte inválido.");
         }
     }
+
+[HttpGet]
+public async Task<IActionResult> DescargarRechazados(
+    string cargaId,
+    string carpetaResultado,
+    CancellationToken cancellationToken)
+{
+    if (!Guid.TryParseExact(cargaId, "N", out var id)
+        || string.IsNullOrWhiteSpace(carpetaResultado)
+        || !carpetaResultado.StartsWith(
+            "resultado-", StringComparison.Ordinal)
+        || !Guid.TryParseExact(
+            carpetaResultado["resultado-".Length..], "N", out _))
+    {
+        return BadRequest("La carga o la carpeta no es válida.");
+    }
+
+    FileStream? temporal = null;
+
+    try
+    {
+        using var cliente = _clientes.CreateClient("CargaDatosApi");
+
+        var ruta = $"api/cargas/{id:N}/rechazados"
+            + "?carpetaResultado="
+            + Uri.EscapeDataString(carpetaResultado);
+
+        using var respuesta = await cliente.GetAsync(
+            ruta,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            return StatusCode(
+                (int)respuesta.StatusCode,
+                "No se pudo descargar el detalle de rechazados.");
+        }
+
+        if (respuesta.Content.Headers.ContentType?.MediaType
+            != "application/zip")
+        {
+            return StatusCode(
+                502, "La API no devolvió el archivo ZIP esperado.");
+        }
+
+        var rutaTemporal = Path.Combine(
+            Path.GetTempPath(),
+            $"sivcr-descarga-{Guid.NewGuid():N}.zip");
+
+        temporal = new FileStream(
+            rutaTemporal,
+            FileMode.CreateNew,
+            FileAccess.ReadWrite,
+            FileShare.None,
+            81920,
+            FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+
+        // Limitar también el tiempo de transferencia del archivo.
+        using var limite = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+
+        limite.CancelAfter(TimeSpan.FromMinutes(10));
+
+        await respuesta.Content.CopyToAsync(
+            temporal, limite.Token);
+
+        temporal.Position = 0;
+
+        var descarga = File(
+            temporal,
+            "application/zip",
+            $"rechazados-carga-{id:N}.zip");
+
+        // ASP.NET pasa a encargarse de cerrar y eliminar el temporal.
+        temporal = null;
+        return descarga;
+    }
+    catch (HttpRequestException)
+    {
+        return StatusCode(
+            502, "No se pudo contactar con la API de cargas.");
+    }
+    catch (OperationCanceledException)
+        when (!cancellationToken.IsCancellationRequested)
+    {
+        return StatusCode(
+            504, "Se agotó el tiempo de espera de la descarga.");
+    }
+    catch (IOException)
+    {
+        return StatusCode(
+            500, "No se pudo preparar el archivo de descarga.");
+    }
+    finally
+    {
+        if (temporal != null)
+            await temporal.DisposeAsync();
+    }
+}
+
 }

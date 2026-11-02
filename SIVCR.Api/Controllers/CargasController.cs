@@ -170,4 +170,57 @@ public sealed class CargasController : ControllerBase
             });
         }
     }
+
+[HttpGet("{cargaId}/rechazados")]
+public async Task<IActionResult> DescargarRechazados(
+    string cargaId,
+    [FromQuery] string carpetaResultado,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var archivo = await _servicio.CrearDescargaRechazadosAsync(
+            cargaId,
+            carpetaResultado,
+            cancellationToken);
+
+        // ASP.NET cierra el archivo cuando termina la respuesta.
+        return File(
+            archivo,
+            "application/zip",
+            $"rechazados-carga-{cargaId}.zip");
+    }
+    catch (ArgumentException error)
+    {
+        return BadRequest(new { mensaje = error.Message });
+    }
+    catch (FileNotFoundException)
+    {
+        return NotFound(new
+        {
+            mensaje = "El detalle de rechazados no está disponible."
+        });
+    }
+    catch (System.Text.Json.JsonException)
+    {
+        return StatusCode(500, new
+        {
+            mensaje = "El reporte de esta carga tiene un formato inválido."
+        });
+    }
+    catch (InvalidOperationException)
+    {
+        return StatusCode(500, new
+        {
+            mensaje = "El reporte no permite generar la descarga."
+        });
+    }
+    catch (IOException)
+    {
+        return StatusCode(500, new
+        {
+            mensaje = "No se pudo preparar el archivo de descarga."
+        });
+    }
+}
 }

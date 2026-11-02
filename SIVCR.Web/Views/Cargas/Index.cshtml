@@ -206,7 +206,7 @@
     <section class="cargas__panel"
              aria-labelledby="titulo-reporte">
         <div class="cargas__cabecera-reporte">
-    <h2>3. Reporte de calidad de datos</h2>
+     <h2>3. Reporte de calidad de datos</h2>
 
     @if (Model.Reporte != null
         && !string.IsNullOrWhiteSpace(Model.CargaId)
@@ -219,6 +219,16 @@
            class="sivcr-button sivcr-button--secondary">
             Descargar reporte
         </a>
+@if (Model.Reporte != null && Model.Reporte.RegistrosRechazados > 0)
+{
+    <a asp-controller="Cargas"
+       asp-action="DescargarRechazados"
+       asp-route-cargaId="@Model.CargaId"
+       asp-route-carpetaResultado="@Model.CarpetaResultado"
+       class="sivcr-button sivcr-button--secondary">
+        Descargar rechazados (.zip)
+    </a>
+}
     }
 </div>
 

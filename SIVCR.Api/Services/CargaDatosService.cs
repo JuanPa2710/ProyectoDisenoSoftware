@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
@@ -565,4 +566,129 @@ public sealed class CargaDatosService
         using var documento = JsonDocument.Parse(contenido);
         return documento.RootElement.Clone();
     }
+
+public async Task<FileStream> CrearDescargaRechazadosAsync(
+    string cargaId,
+    string carpetaResultado,
+    CancellationToken cancellationToken)
+{
+    if (!Guid.TryParseExact(cargaId, "N", out var id)
+        || string.IsNullOrWhiteSpace(carpetaResultado)
+        || !carpetaResultado.StartsWith(
+            "resultado-", StringComparison.Ordinal)
+        || !Guid.TryParseExact(
+            carpetaResultado["resultado-".Length..], "N", out _))
+    {
+        throw new ArgumentException(
+            "La carga o la carpeta de resultados no es válida.");
+    }
+
+    var reporte = await LeerReporteAsync(
+        cargaId, carpetaResultado, cancellationToken);
+
+    if (!reporte.TryGetProperty(
+            "registros_rechazados", out var propiedad)
+        || propiedad.ValueKind != JsonValueKind.Number
+        || !propiedad.TryGetInt64(out var rechazados)
+        || rechazados < 0)
+    {
+        throw new InvalidOperationException(
+            "El reporte no contiene un conteo válido de rechazados.");
+    }
+
+    if (rechazados == 0)
+    {
+        throw new ArgumentException(
+            "Esta carga no tiene registros rechazados.");
+    }
+
+    var resultado = Path.Combine(
+        _options.DataDirectory,
+        "cargas",
+        id.ToString("N"),
+        carpetaResultado);
+
+    var carpeta = Path.Combine(resultado, "rechazados");
+
+    if (!Directory.Exists(carpeta)
+        || !File.Exists(Path.Combine(carpeta, "_SUCCESS")))
+    {
+        throw new FileNotFoundException(
+            "El detalle de rechazados todavía no está disponible.");
+    }
+
+    var archivos = Directory.GetFiles(
+        carpeta, "part-*.json", SearchOption.TopDirectoryOnly);
+
+    Array.Sort(archivos, StringComparer.Ordinal);
+
+    if (archivos.Length == 0)
+    {
+        throw new FileNotFoundException(
+            "No se encontraron archivos de registros rechazados.");
+    }
+
+    // El ZIP se prepara en disco y se elimina al cerrar la descarga.
+    var temporal = Path.Combine(
+        Path.GetTempPath(),
+        $"sivcr-rechazados-{Guid.NewGuid():N}.zip");
+
+    var salida = new FileStream(
+        temporal,
+        FileMode.CreateNew,
+        FileAccess.ReadWrite,
+        FileShare.None,
+        81920,
+        FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+
+    try
+    {
+        using (var zip = new ZipArchive(
+            salida, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var entradaReporte = zip.CreateEntry(
+                "reporte.json", CompressionLevel.Fastest);
+
+            await using (var destino = entradaReporte.Open())
+            {
+                await JsonSerializer.SerializeAsync(
+                    destino,
+                    reporte,
+                    new JsonSerializerOptions { WriteIndented = true },
+                    cancellationToken);
+            }
+
+            foreach (var archivo in archivos)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var entrada = zip.CreateEntry(
+                    "rechazados/" + Path.GetFileName(archivo),
+                    CompressionLevel.Fastest);
+
+                await using var origen = new FileStream(
+                    archivo,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    81920,
+                    FileOptions.Asynchronous
+                        | FileOptions.SequentialScan);
+
+                await using var destino = entrada.Open();
+
+                await origen.CopyToAsync(
+                    destino, cancellationToken);
+            }
+        }
+
+        salida.Position = 0;
+        return salida;
+    }
+    catch
+    {
+        await salida.DisposeAsync();
+        throw;
+    }
+}
 }
