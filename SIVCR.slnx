@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SIVCR.Api/SIVCR.Api.csproj" Id="c939a178-1ed3-4e3a-86b0-31146eb1f862" />
+  <Project Path="SIVCR.Web/SIVCR.Web.csproj" Id="a56026be-f583-4d15-a359-2682a9b96a33" />
+</Solution>

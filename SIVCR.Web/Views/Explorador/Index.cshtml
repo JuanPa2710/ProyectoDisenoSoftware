@@ -1,0 +1,272 @@
+@model IReadOnlyList<SIVCR.Web.Models.RegistroVialViewModel>
+
+@{
+    ViewData["Title"] = "Explorador de registros";
+}
+
+<section class="explorador"
+         aria-labelledby="explorador_titulo">
+    <header class="explorador_encabezado">
+        <div>
+            <p class="explorador_breadcrumb">
+                Inicio / Explorador de registros
+            </p>
+            <h1 id="explorador_titulo">
+                Explorador de registros viales
+            </h1>
+        </div>
+    </header>
+
+    <section class="explorador_panel"
+             aria-label="Consulta de incidentes">
+        <div class="explorador_herramientas">
+            <div class="explorador_acciones">
+                <button id="abrir_exportacion"
+                        class="sivcr-button sivcr-button--primary"
+                        type="button">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M3 15v2h14v-2" />
+                    </svg>
+                    Exportar
+                </button>
+
+                <button id="ordenar_consulta"
+                        class="explorador_accion"
+                        type="button">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M7 4v12M4.5 7 7 4l2.5 3M13 16V4M10.5 13 13 16l2.5-3" />
+                    </svg>
+                    Ordenar
+                </button>
+
+                <details class="explorador_columnas">
+                    <summary class="explorador_accion">
+                        <svg viewBox="0 0 20 20"
+                             aria-hidden="true">
+                            <path d="M3 4h14v12H3zM8 4v12M12 4v12" />
+                        </svg>
+                        Columnas
+                    </summary>
+                    <div class="explorador_columnas_menu"
+                         id="menu_columnas">
+                        <label><input type="checkbox" data-column="0" checked /> ID</label>
+                        <label><input type="checkbox" data-column="1" checked /> Fecha</label>
+                        <label><input type="checkbox" data-column="2" checked /> Hora</label>
+                        <label><input type="checkbox" data-column="3" checked /> Provincia</label>
+                        <label><input type="checkbox" data-column="4" checked /> Cantón</label>
+                        <label><input type="checkbox" data-column="5" checked /> Ruta</label>
+                        <label><input type="checkbox" data-column="6" checked /> Vehículo</label>
+                        <label><input type="checkbox" data-column="7" checked /> Franja</label>
+                        <label><input type="checkbox" data-column="8" checked /> Clima</label>
+                        <label><input type="checkbox" data-column="9" checked /> Calzada</label>
+                        <label><input type="checkbox" data-column="10" checked /> TPR</label>
+                        <label><input type="checkbox" data-column="11" checked /> Severidad</label>
+                    </div>
+                </details>
+
+                <a class="explorador_accion"
+                   asp-controller="Home"
+                   asp-action="Index">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M3 5h14M3 10h14M3 15h14M6 3v4M14 8v4M9 13v4" />
+                    </svg>
+                    Editar filtros
+                </a>
+            </div>
+
+        </div>
+
+        <div class="explorador_resumen">
+            <span id="total_consulta"
+                  class="explorador_total"></span>
+            <span id="detalle_orden"
+                  class="explorador_detalle_orden">
+                Orden: 1) Fecha descendente · 2) Severidad descendente
+            </span>
+        </div>
+
+        <div id="estado_carga"
+             class="explorador_estado">
+            <span class="explorador_spinner"
+                  aria-hidden="true"></span>
+            <strong>Cargando registros...</strong>
+        </div>
+
+        <div id="estado_error"
+             class="explorador_estado explorador_estado_error"
+             hidden>
+            <strong>No se pudieron cargar los registros.</strong>
+            <p>Revisá la consulta e intentá nuevamente.</p>
+
+            <button id="reintentar"
+                    type="button"
+                    class="sivcr-button sivcr-button--secondary">
+                Reintentar
+            </button>
+        </div>
+
+        <div id="contenido_tabla">
+            <div class="explorador_tabla_contenedor">
+                <table class="explorador_tabla"
+                       aria-label="Incidentes viales">
+                    <thead>
+                        <tr>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Id">
+                                    ID <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Fecha">
+                                    Fecha <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">Hora</th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Provincia">
+                                    Provincia <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Canton">
+                                    Cantón <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Ruta">
+                                    Ruta <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">Vehículo</th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Franja">
+                                    Franja <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Clima">
+                                    Clima <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Calzada">
+                                    Calzada <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Tpr">
+                                    TPR <span class="orden"></span>
+                                </button>
+                            </th>
+                            <th scope="col">
+                                <button type="button"
+                                        data-sort="Severidad">
+                                    Severidad <span class="orden"></span>
+                                </button>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="filas_registros"></tbody>
+                </table>
+            </div>
+
+            <div id="sin_resultados"
+                 class="explorador_sin_resultados"
+                 hidden>
+                <svg viewBox="0 0 24 24"
+                     aria-hidden="true">
+                    <circle cx="10.5"
+                            cy="10.5"
+                            r="5.5" />
+                    <path d="m14.5 14.5 5 5M7 10.5h7" />
+                </svg>
+                <strong>No hay registros para exportar</strong>
+            </div>
+
+            <footer class="explorador_paginacion">
+                <span id="rango_registros"></span>
+
+                <div aria-label="Paginación">
+                    <button id="pagina_anterior"
+                            type="button"
+                            aria-label="Página anterior">
+                        <svg viewBox="0 0 20 20"
+                             aria-hidden="true">
+                            <path d="m12.5 4-6 6 6 6" />
+                        </svg>
+                    </button>
+
+                    <span id="numeros_pagina"
+                          class="explorador_numeros"></span>
+
+                    <button id="pagina_siguiente"
+                            type="button"
+                            aria-label="Página siguiente">
+                        <svg viewBox="0 0 20 20"
+                             aria-hidden="true">
+                            <path d="m7.5 4 6 6-6 6" />
+                        </svg>
+                    </button>
+                </div>
+            </footer>
+        </div>
+    </section>
+</section>
+
+<div class="modal fade"
+     id="dialogo_exportacion"
+     tabindex="-1"
+     aria-labelledby="exportacion_titulo"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered explorador_modal_sin_exportacion">
+        <div class="modal-content">
+            <header class="explorador_modal_encabezado">
+                <h2 id="exportacion_titulo">Exportar consulta</h2>
+                <button type="button"
+                        class="explorador_modal_cerrar"
+                        data-bs-dismiss="modal"
+                        aria-label="Cerrar">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M5 5l10 10M15 5 5 15" />
+                    </svg>
+                </button>
+            </header>
+
+            <div class="explorador_modal_aviso">
+                <svg viewBox="0 0 20 20"
+                     aria-hidden="true">
+                    <path d="M10 2.5 18 17H2L10 2.5Z" />
+                    <path d="M10 7v4M10 14h.01" />
+                </svg>
+
+                <div>
+                    <strong>No hay registros para exportar</strong>
+                    <p>La consulta actual no contiene resultados.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script id="datos_registros"
+        type="application/json">
+@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model))
+</script>
+
+@section Scripts {
+    <script src="~/js/explorador.js"
+            asp-append-version="true"></script>
+}
