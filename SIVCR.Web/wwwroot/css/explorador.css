@@ -172,11 +172,14 @@
 }
 
 .explorador_tabla_contenedor {
-    overflow-x: visible;
+    overflow: auto;
+    max-height: 520px;
+    scrollbar-gutter: stable;
 }
 
 .explorador_tabla {
     width: 100%;
+    min-width: 1400px;
     border-collapse: collapse;
 }
 
@@ -188,6 +191,9 @@
     color: var(--sivcr-text-soft);
     font-size: 12px;
     text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 2;
 }
 
 .explorador_tabla th button {
@@ -221,22 +227,6 @@
     display: inline;
     font-size: 11px;
     font-weight: 600;
-}
-
-.severidad_fallecidos {
-    color: #ff353d;
-}
-
-.severidad_graves {
-    color: #ff9800;
-}
-
-.severidad_leves {
-    color: #35c768;
-}
-
-.severidad_danos {
-    color: #1683ff;
 }
 
 .explorador_estado {

@@ -159,7 +159,7 @@
         ).show();
     });
 
-    function descargarCsv(separador, extension) {
+    function descargarCsv(separador, extension, registrosExportacion) {
         const encabezados = [
             "ID", "Fecha", "Hora", "Provincia", "Cantón", "Ruta", "Vehículo",
             "Franja", "Clima", "Calzada", "TPR", "Severidad"
@@ -168,7 +168,7 @@
             "Id", "Fecha", "Hora", "Provincia", "Canton", "Ruta", "Vehiculo",
             "Franja", "Clima", "Calzada", "Tpr", "Severidad"
         ];
-        const filasCsv = filtrados.map((registro) =>
+        const filasCsv = registrosExportacion.map((registro) =>
             campos.map((campo) =>
                 `"${String(registro[campo] ?? "").replaceAll('"', '""')}"`
             ).join(separador)
@@ -191,21 +191,36 @@
     }
 
     // exporta todos los resultados filtrados
-    document.getElementById("confirmar_exportacion").addEventListener("click", () => {
+    // coneccion a Mongo
+    // solicita al servidor todos los registros para exportarlos
+    async function obtenerDatosExportacion() {
+        const respuesta = await fetch("/Explorador/DatosExportacion", {
+            headers: { "Accept": "application/json" }
+        });
+        if (!respuesta.ok) throw new Error("No fue posible obtener los datos para exportar.");
+        return respuesta.json();
+    }
+
+    document.getElementById("confirmar_exportacion").addEventListener("click", async () => {
         const formato = document.querySelector(
             'input[name="formato_exportacion"]:checked'
         ).value;
 
-        if (formato === "csv") descargarCsv(",", "csv");
-        if (formato === "excel") descargarCsv(";", "xls");
+        try {
+            const registrosExportacion = await obtenerDatosExportacion();
 
-        if (formato === "pdf") {
-            window.exportarConsultaPdf(filtrados);
+            if (formato === "csv") descargarCsv(",", "csv", registrosExportacion);
+            if (formato === "excel") descargarCsv(";", "xls", registrosExportacion);
+            if (formato === "pdf") {
+                window.exportarConsultaPdf(registrosExportacion);
+            }
+
+            document.getElementById("exportacion_con_resultados").hidden = true;
+            document.getElementById("confirmar_exportacion").hidden = true;
+            document.getElementById("exportacion_completada").hidden = false;
+        } catch (errorExportacion) {
+            alert(errorExportacion.message);
         }
-
-        document.getElementById("exportacion_con_resultados").hidden = true;
-        document.getElementById("confirmar_exportacion").hidden = true;
-        document.getElementById("exportacion_completada").hidden = false;
     });
 
     function iniciarCarga() {

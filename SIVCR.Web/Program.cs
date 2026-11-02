@@ -1,4 +1,45 @@
+using MongoDB.Driver;
+
+
 var builder = WebApplication.CreateBuilder(args);
+
+var cargarDatos = builder.Configuration.GetValue<bool>(
+    "Explorador:CargarDatos"
+);
+
+// coneccion a Mongo
+// crea el cliente solo cuando la carga real está activa
+if (cargarDatos) {
+    var mongoConfiguration = builder.Configuration.GetSection("MongoDB");
+    var mongoPassword = Environment.GetEnvironmentVariable(
+        "SIVCR_MONGO_PASSWORD"
+    );
+
+    if (string.IsNullOrWhiteSpace(mongoPassword)) {
+        throw new InvalidOperationException(
+            "Falta configurar SIVCR_MONGO_PASSWORD."
+        );
+    }
+
+    var mongoCredentials = MongoCredential.CreateCredential(
+        mongoConfiguration["AuthSource"]!,
+        mongoConfiguration["Username"]!,
+        mongoPassword
+    );
+
+    var mongoSettings = new MongoClientSettings {
+        Server = new MongoServerAddress(
+            mongoConfiguration["Host"]!,
+            int.Parse(mongoConfiguration["Port"]!)
+        ),
+        Credential = mongoCredentials,
+        ServerSelectionTimeout = TimeSpan.FromSeconds(5)
+    };
+
+    builder.Services.AddSingleton(
+        new MongoClient(mongoSettings)
+    );
+}
 
 builder.Services.AddHttpClient("CargaDatosApi", client =>
 {
