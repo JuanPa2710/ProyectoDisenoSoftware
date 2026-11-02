@@ -2,6 +2,11 @@
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
     var isHomeController = string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase);
+    var isExploradorController = string.Equals(
+        currentController,
+        "Explorador",
+        StringComparison.OrdinalIgnoreCase
+    );
     var isCargasController = string.Equals(
         currentController,
         "Cargas",
@@ -23,6 +28,12 @@
     {
         <link rel="stylesheet"
               href="~/css/cargas.css"
+              asp-append-version="true" />
+    }
+    @if (isExploradorController)
+    {
+        <link rel="stylesheet"
+              href="~/css/explorador.css"
               asp-append-version="true" />
     }
     <link rel="stylesheet" href="~/SIVCR.Web.styles.css" asp-append-version="true" />
@@ -66,7 +77,10 @@
                 </svg>
                 <span>Dashboard</span>
             </a>
-            <a class="sivcr-nav-item" href="#" aria-disabled="true">
+            <a class="sivcr-nav-item @(isExploradorController ? "sivcr-nav-item--active" : "")"
+               asp-controller="Explorador"
+               asp-action="Index"
+               aria-current="@(isExploradorController ? "page" : null)">
                 <svg class="sivcr-nav-item__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                     <rect x="2.5" y="3" width="15" height="14" rx="1" />
                     <path d="M2.5 7h15M7 7v10" />
