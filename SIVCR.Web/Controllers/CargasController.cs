@@ -35,16 +35,18 @@ public sealed class CargasController : Controller
         }
 
         if (archivo.Length > 50L * 1024 * 1024)
-        {
-            modelo.Error = "El archivo no puede superar 50 MB.";
-            return View("Index", modelo);
-        }
+{
+    modelo.ErrorValidacionArchivo = true;
+    modelo.Error = "El archivo no puede superar 50 MB.";
+    return View("Index", modelo);
+}
 
         var extension = Path.GetExtension(archivo.FileName)
             .ToLowerInvariant();
 
         if (extension is not ".csv" and not ".json" and not ".xlsx")
         {
+            modelo.ErrorValidacionArchivo = true;
             modelo.Error = "Se permiten archivos CSV, JSON y Excel (.xlsx).";
             return View("Index", modelo);
         }
@@ -164,6 +166,7 @@ public sealed class CargasController : Controller
                             && !string.IsNullOrWhiteSpace(mensaje.GetString()))
                         {
                             modelo.Error = mensaje.GetString();
+                            modelo.ErrorValidacionArchivo = true;
                         }
                     }
                     catch (JsonException)

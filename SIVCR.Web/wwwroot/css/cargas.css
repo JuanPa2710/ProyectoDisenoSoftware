@@ -321,3 +321,12 @@
 .cargas__cabecera-reporte h2 {
     margin: 0;
 }
+.cargas .cargas__paso--error {
+    color: #ff858f;
+}
+
+.cargas .cargas__paso--error .cargas__numero {
+    background: #450b12;
+    border: 1px solid #ff5969;
+    color: #ffffff;
+}

@@ -3,10 +3,11 @@
 @{
     ViewData["Title"] = "Carga de datos viales";
 
-    var pasoActual = Model.Importada ? 4
-        : Model.Reporte != null ? 3
-        : !string.IsNullOrWhiteSpace(Model.CargaId) ? 2
-        : 1;
+    var pasoActual = Model.ErrorValidacionArchivo ? 2
+    : Model.Importada ? 4
+    : Model.Reporte != null ? 3
+    : !string.IsNullOrWhiteSpace(Model.CargaId) ? 2
+    : 1;
 
     var pasos = new[]
     {
@@ -45,14 +46,15 @@
             var numero = i + 1;
             var completado = numero < pasoActual;
             var activo = numero == pasoActual;
+            var fallo = Model.ErrorValidacionArchivo && numero == 2;
 
-            <li class="cargas__paso @(activo ? "cargas__paso--activo" : "") @(completado ? "cargas__paso--completo" : "")"
-                aria-current="@(activo ? "step" : null)">
-                <span class="cargas__numero">
-                    @(completado ? "✓" : numero.ToString())
-                </span>
-                <span>@pasos[i]</span>
-            </li>
+            <li class="cargas__paso @(activo ? "cargas__paso--activo" : "") @(completado ? "cargas__paso--completo" : "") @(fallo ? "cargas__paso--error" : "")"
+    aria-current="@(activo ? "step" : null)">
+    <span class="cargas__numero">
+        @(fallo ? "✕" : completado ? "✓" : numero.ToString())
+    </span>
+    <span>@pasos[i]@(fallo ? " — Falló" : "")</span>
+</li>
         }
     </ol>
     <div class="cargas__columnas">
@@ -106,7 +108,21 @@
 
                 
             </form>
-            @if (!string.IsNullOrWhiteSpace(Model.CargaId))
+            @if (Model.ErrorValidacionArchivo)
+{
+    <div class="cargas__error" role="status">
+        <strong>El archivo no superó la validación.</strong>
+        <p>Seleccioná un archivo corregido para continuar. No se ha realizado ninguna importación de esta carga.</p>
+        <a asp-controller="Cargas"
+           asp-action="Index"
+           class="sivcr-button sivcr-button--secondary">
+            Seleccionar otro archivo
+        </a>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.CargaId)
+    && !Model.ErrorValidacionArchivo)
             {
                 <div class="cargas__recibido" role="status">
                     <strong>Archivo recibido correctamente</strong>
@@ -161,7 +177,9 @@
                         </p>
                     </div>
                     <span class="cargas__estado">
-    @(Model.Reporte == null ? "Pendiente" : "Archivo leído")
+    @(Model.ErrorValidacionArchivo
+    ? "No válido"
+    : Model.Reporte == null ? "Pendiente" : "Archivo leído")
 </span>
                 </li>
 

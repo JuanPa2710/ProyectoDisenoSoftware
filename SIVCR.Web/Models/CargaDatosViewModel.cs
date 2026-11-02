@@ -8,6 +8,7 @@ public sealed class CargaDatosViewModel
     public string? CarpetaResultado { get; set; }
     public string? NombreArchivo { get; set; }
     public string? Error { get; set; }
+    public bool ErrorValidacionArchivo { get; set; }
     public ReporteCargaViewModel? Reporte { get; set; }
     public bool Importada { get; set; }
 }
