@@ -269,12 +269,13 @@ a {
   .dashboard__heading,.active-filters,.geographic-card__content,.vehicle-card__content,.severity-card__content{align-items:stretch;flex-direction:column}.dashboard__actions{margin-top:12px}.filter-actions{justify-content:space-between;margin-top:10px}.dashboard h1{font-size:21px}.filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-grid,.chart-grid{grid-template-columns:1fr}.kpi-card,.geographic-card,.temporal-card,.vehicle-card,.demographic-card,.severity-card,.routes-card{grid-column:auto}.map-placeholder{flex-basis:160px}.severity-kpis{grid-template-columns:repeat(2,1fr)}.chart-card__header{align-items:flex-start;flex-direction:column}.chart-card__header span{text-align:left}.route-row{grid-template-columns:55px minmax(70px,1fr) 45px 48px;gap:6px;font-size:11px}.heatmap{min-width:510px}.temporal-card{overflow-x:auto}.heatmap-legend{min-width:510px}
 
   .dashboard-message--ok{border-color:#3f8f63;background:#1f3d2d;color:#d6f5e3}
-  .dashboard-message[hidden]{display:none}
-  .save-filters-dialog{width:min(420px,calc(100vw - 32px));padding:20px;border:1px solid var(--sivcr-input-border);border-radius:8px;background:var(--sivcr-surface);color:#fff}
-  .save-filters-dialog::backdrop{background:rgb(0 0 0 / 60%)}
-  .save-filters-dialog h2{margin:0 0 14px;font-size:16px;font-weight:600;line-height:22px}
-  .save-filters-dialog input{width:100%;height:36px;padding:0 8px;border:1px solid var(--sivcr-input-border);border-radius:4px;background:var(--sivcr-surface);color:#fff;font:400 14px/20px "Open Sans",Arial,sans-serif}
-  .save-filters-dialog__error{margin:10px 0 0;color:#ffb3b3;font-size:13px}
-  .save-filters-dialog__error[hidden]{display:none}
-  .save-filters-dialog__actions{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:16px}
+.dashboard-message[hidden]{display:none}
+.save-filters-dialog{width:min(420px,calc(100vw - 32px));padding:20px;border:1px solid var(--sivcr-border);background:var(--sivcr-surface);color:var(--sivcr-text);font-family:"Open Sans",Arial,sans-serif}
+.save-filters-dialog::backdrop{background:rgb(0 0 0 / 60%)}
+.save-filters-dialog input{width:100%;height:36px;padding:0 8px;border:1px solid var(--sivcr-input-border);border-radius:4px;background:var(--sivcr-surface);color:#fff;font:400 14px/20px "Open Sans",Arial,sans-serif}
+.save-filters-dialog input::placeholder{color:var(--sivcr-text-muted)}
+.save-filters-dialog input:focus{outline:2px solid var(--sivcr-accent);outline-offset:0}
+.save-filters-dialog__error{margin:10px 0 0;color:#ffb3b3;font-size:13px}
+.save-filters-dialog__error[hidden]{display:none}
+.save-filters-dialog__actions{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:16px}
 }

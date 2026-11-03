@@ -15,6 +15,7 @@
     });
 })();
 
+
 (() => {
     const form = document.querySelector(".dashboard-filters");
     const boton = document.getElementById("btn-guardar-filtros");
@@ -27,7 +28,7 @@
     const aviso = document.getElementById("guardar-filtros-aviso");
     const numericos = new Set(["Anio", "Mes", "DiaSemana"]);
 
-    // Combos -> { provincia: "...", anio: 2025, ... } (null si está en "Todos").
+    
     const leerFiltros = () => {
         const filtros = {};
         for (const select of form.querySelectorAll("select[name^='Filtros.']")) {

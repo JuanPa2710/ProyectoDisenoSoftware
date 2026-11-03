@@ -45,9 +45,21 @@
 
   <div id="guardar-filtros-aviso" class="dashboard-message" role="status" hidden></div>
 
-  <dialog id="dialogo-guardar-filtros" class="save-filters-dialog" aria-labelledby="save-filters-title">
+  <style>
+    .dashboard-message--ok { border-color: #3f8f63; background: #1f3d2d; color: #d6f5e3; }
+    .save-filters-dialog { width: min(420px, calc(100vw - 32px)); padding: 16px; border: 1px solid var(--sivcr-border); border-radius: 8px; background: var(--sivcr-surface); color: var(--sivcr-text); box-shadow: 0 8px 24px rgb(0 0 0 / 45%); font-family: "Open Sans", Arial, sans-serif; }
+    .save-filters-dialog::backdrop { background: rgb(0 0 0 / 60%); }
+    .save-filters-dialog input[type="text"] { box-sizing: border-box; width: 100%; height: 36px; padding: 0 8px; border: 1px solid var(--sivcr-input-border); border-radius: 4px; background: var(--sivcr-surface); color: #fff; font: 400 14px/20px "Open Sans", Arial, sans-serif; }
+    .save-filters-dialog input[type="text"]::placeholder { color: var(--sivcr-text-muted); }
+    .save-filters-dialog input[type="text"]:focus { outline: 2px solid var(--sivcr-accent); outline-offset: 0; border-color: var(--sivcr-accent); }
+    .save-filters-dialog__error { margin: 10px 0 0; color: #ffb3b3; font-size: 13px; line-height: 18px; }
+    .save-filters-dialog__error[hidden], .dashboard-message[hidden] { display: none; }
+    .save-filters-dialog__actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 16px; }
+  </style>
+
+  <dialog id="dialogo-guardar-filtros" class="dashboard-card save-filters-dialog" aria-labelledby="save-filters-title">
     <form method="post" asp-action="GuardarFiltros" id="form-guardar-filtros">
-      <h2 id="save-filters-title">Guardar combinación de filtros</h2>
+      <h2 id="save-filters-title" class="dashboard-card__title"><svg class="dashboard-card__title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg>Guardar combinación de filtros</h2>
       <label class="filter-field"><span>Nombre de la combinación</span>
         <input type="text" id="nombre-filtros" maxlength="80" required placeholder="Ej. Lluvia en Ruta 32" />
       </label>
