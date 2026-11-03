@@ -36,7 +36,7 @@ public sealed class HomeController : Controller
 
             // Todas las consultas se ejecutan en MongoDB. La Web recibe
             // únicamente conteos y agrupaciones, no los documentos completos.
-            var opciones = ObtenerOpcionesAsync(coleccion);
+            var opciones = ObtenerOpcionesAsync(coleccion, filtros);
             var total = coleccion.CountDocumentsAsync(filtro);
             var provincias = AgruparAsync(coleccion, filtro, "ubicacion.provincia", 7);
             var tipos = AgruparAsync(coleccion, filtro, "tipo_accidente", 5);
@@ -130,20 +130,20 @@ public sealed class HomeController : Controller
     }
 
     private async Task<DashboardOpcionesFiltros> ObtenerOpcionesAsync(
-        IMongoCollection<BsonDocument> coleccion)
+        IMongoCollection<BsonDocument> coleccion, DashboardFiltrosViewModel filtros)
     {
-        var provincias = ObtenerTextosAsync(coleccion, "ubicacion.provincia");
-        var cantones = ObtenerTextosAsync(coleccion, "ubicacion.canton");
-        var distritos = ObtenerTextosAsync(coleccion, "ubicacion.distrito");
-        var rutas = ObtenerTextosAsync(coleccion, "ubicacion.ruta");
-        var anios = ObtenerNumerosAsync(coleccion, "tiempo.anio");
-        var meses = ObtenerNumerosAsync(coleccion, "tiempo.mes");
-        var dias = ObtenerNumerosAsync(coleccion, "tiempo.dia_semana");
-        var franjas = ObtenerTextosAsync(coleccion, "franja_horaria");
-        var tipos = ObtenerTextosAsync(coleccion, "tipo_accidente");
-        var climas = ObtenerTextosAsync(coleccion, "condiciones.clima");
-        var calzadas = ObtenerTextosAsync(coleccion, "condiciones.estado_calzada");
-        var severidades = ObtenerTextosAsync(coleccion, "clase_accidente");
+        var provincias = ObtenerTextosAsync(coleccion, "ubicacion.provincia", FiltroOpciones(filtros, "Provincia"));
+        var cantones = ObtenerTextosAsync(coleccion, "ubicacion.canton", FiltroOpciones(filtros, "Canton"));
+        var distritos = ObtenerTextosAsync(coleccion, "ubicacion.distrito", FiltroOpciones(filtros, "Distrito"));
+        var rutas = ObtenerTextosAsync(coleccion, "ubicacion.ruta", FiltroOpciones(filtros, "Ruta"));
+        var anios = ObtenerNumerosAsync(coleccion, "tiempo.anio", FiltroOpciones(filtros, "Anio"));
+        var meses = ObtenerNumerosAsync(coleccion, "tiempo.mes", FiltroOpciones(filtros, "Mes"));
+        var dias = ObtenerNumerosAsync(coleccion, "tiempo.dia_semana", FiltroOpciones(filtros, "DiaSemana"));
+        var franjas = ObtenerTextosAsync(coleccion, "franja_horaria", FiltroOpciones(filtros, "FranjaHoraria"));
+        var tipos = ObtenerTextosAsync(coleccion, "tipo_accidente", FiltroOpciones(filtros, "TipoAccidente"));
+        var climas = ObtenerTextosAsync(coleccion, "condiciones.clima", FiltroOpciones(filtros, "Clima"));
+        var calzadas = ObtenerTextosAsync(coleccion, "condiciones.estado_calzada", FiltroOpciones(filtros, "EstadoCalzada"));
+        var severidades = ObtenerTextosAsync(coleccion, "clase_accidente", FiltroOpciones(filtros, "Severidad"));
 
         await Task.WhenAll(
             provincias, cantones, distritos, rutas, anios, meses, dias,
@@ -166,13 +166,25 @@ public sealed class HomeController : Controller
         };
     }
 
+    private static FilterDefinition<BsonDocument> FiltroOpciones(
+        DashboardFiltrosViewModel filtros, string excluida)
+    {
+        var copia = new DashboardFiltrosViewModel();
+        foreach (var propiedad in typeof(DashboardFiltrosViewModel).GetProperties())
+            if (propiedad.Name != excluida)
+                propiedad.SetValue(copia, propiedad.GetValue(filtros));
+        if (excluida == "Provincia") { copia.Canton = null; copia.Distrito = null; }
+        if (excluida == "Canton") copia.Distrito = null;
+        return CrearFiltro(copia);
+    }
+
     private static async Task<IReadOnlyList<string>> ObtenerTextosAsync(
         IMongoCollection<BsonDocument> coleccion,
-        string campo)
+        string campo, FilterDefinition<BsonDocument> filtro)
     {
         var valores = await coleccion.Distinct<BsonValue>(
             campo,
-            Builders<BsonDocument>.Filter.Empty).ToListAsync();
+            filtro).ToListAsync();
 
         return valores
             .Where(valor => valor.IsString && !string.IsNullOrWhiteSpace(valor.AsString))
@@ -184,11 +196,11 @@ public sealed class HomeController : Controller
 
     private static async Task<IReadOnlyList<int>> ObtenerNumerosAsync(
         IMongoCollection<BsonDocument> coleccion,
-        string campo)
+        string campo, FilterDefinition<BsonDocument> filtro)
     {
         var valores = await coleccion.Distinct<BsonValue>(
             campo,
-            Builders<BsonDocument>.Filter.Empty).ToListAsync();
+            filtro).ToListAsync();
 
         return valores
             .Where(valor => valor.IsInt32 || valor.IsInt64)
