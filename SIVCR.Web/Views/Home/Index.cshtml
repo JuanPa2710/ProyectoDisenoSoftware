@@ -33,7 +33,7 @@
   <header class="dashboard__heading">
     <div><p class="dashboard__breadcrumb">Inicio / Dashboard</p><h1 id="dashboard-title">Dashboard de siniestralidad vial</h1></div>
     <div class="dashboard__actions">
-      <button class="sivcr-button sivcr-button--secondary" type="button">Guardar filtros</button>
+      <button id="btn-guardar-filtros" class="sivcr-button sivcr-button--secondary" type="button">Guardar filtros</button>
       <a asp-controller="Explorador" asp-action="Index" class="sivcr-button sivcr-button--primary">Ver registros y exportar</a>
     </div>
   </header>
@@ -42,6 +42,22 @@
   {
     <div class="dashboard-message dashboard-message--error" role="alert">@Model.ErrorMongoDB</div>
   }
+
+  <div id="guardar-filtros-aviso" class="dashboard-message" role="status" hidden></div>
+
+  <dialog id="dialogo-guardar-filtros" class="save-filters-dialog" aria-labelledby="save-filters-title">
+    <form method="post" asp-action="GuardarFiltros" id="form-guardar-filtros">
+      <h2 id="save-filters-title">Guardar combinación de filtros</h2>
+      <label class="filter-field"><span>Nombre de la combinación</span>
+        <input type="text" id="nombre-filtros" maxlength="80" required placeholder="Ej. Lluvia en Ruta 32" />
+      </label>
+      <p id="guardar-filtros-error" class="save-filters-dialog__error" role="alert" hidden></p>
+      <div class="save-filters-dialog__actions">
+        <button type="button" id="cancelar-guardar-filtros" class="text-button">Cancelar</button>
+        <button type="submit" class="sivcr-button sivcr-button--primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
 
   <form class="dashboard-card dashboard-filters" method="get" aria-labelledby="filters-title">
     <h2 id="filters-title" class="dashboard-card__title"><svg class="dashboard-card__title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg>Filtros multidimensionales</h2>

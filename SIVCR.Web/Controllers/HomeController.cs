@@ -70,6 +70,79 @@ public sealed class HomeController : Controller
         return View(modelo);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GuardarFiltros(
+        [FromBody] GuardarFiltrosRequest solicitud)
+    {
+        var nombre = solicitud.Nombre?.Trim();
+        if (string.IsNullOrWhiteSpace(nombre))
+            return BadRequest(new { mensaje = "Escribe un nombre para la combinación." });
+        if (nombre.Length > 80)
+            return BadRequest(new { mensaje = "El nombre no puede superar los 80 caracteres." });
+
+        var filtros = LimpiarFiltros(solicitud.Filtros);
+        if (!TieneFiltrosActivos(filtros))
+            return BadRequest(new { mensaje = "Selecciona al menos un filtro antes de guardar." });
+
+        try
+        {
+            if (mongoClient is null)
+                throw new InvalidOperationException("MongoDB no está configurado.");
+
+            // Estructura de la colección: los combos sin selección se guardan
+            // con su etiqueta por defecto ("Todas"/"Todos"). Género y rango de
+            // edad aún no existen en la fuente, por eso van en null.
+            var documento = new BsonDocument
+            {
+                { "nombre_filtro", nombre },
+                {
+                    "filtros", new BsonDocument
+                    {
+                        { "provincia", TextoOTodos(filtros.Provincia, "Todas") },
+                        { "canton", TextoOTodos(filtros.Canton) },
+                        { "distrito", TextoOTodos(filtros.Distrito) },
+                        { "ruta", TextoOTodos(filtros.Ruta) },
+                        { "anio", NumeroOTodos(filtros.Anio) },
+                        { "mes", NumeroOTodos(filtros.Mes) },
+                        { "dia_semana", NumeroOTodos(filtros.DiaSemana) },
+                        { "franja_horaria", TextoOTodos(filtros.FranjaHoraria) },
+                        { "tipo_accidente", TextoOTodos(filtros.TipoAccidente) },
+                        { "condicion_climatica", TextoOTodos(filtros.Clima) },
+                        { "estado_calzada", TextoOTodos(filtros.EstadoCalzada) },
+                        { "severidad", TextoOTodos(filtros.Severidad) },
+                        { "genero", BsonNull.Value },
+                        { "rango_edad", BsonNull.Value }
+                    }
+                },
+                { "fecha_creacion", DateTime.UtcNow }
+            };
+
+            var coleccionFiltros = mongoClient
+                .GetDatabase(configuracion["MongoDB:Database"])
+                .GetCollection<BsonDocument>(
+                    configuracion["MongoDB:CollectionFiltros"] ?? "filtros");
+
+            await coleccionFiltros.InsertOneAsync(documento);
+
+            return Ok(new
+            {
+                id = documento["_id"].ToString(),
+                mensaje = $"Filtros «{nombre}» guardados correctamente."
+            });
+        }
+        catch (MongoException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { mensaje = "No fue posible guardar los filtros en MongoDB." });
+        }
+        catch (InvalidOperationException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { mensaje = "MongoDB no está configurado para esta ejecución." });
+        }
+    }
+
     public IActionResult Privacy() => View();
 
     public IActionResult FiltrosGuardados() => View();
@@ -80,6 +153,46 @@ public sealed class HomeController : Controller
         {
             RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier
         });
+
+    private static DashboardFiltrosViewModel LimpiarFiltros(
+        DashboardFiltrosViewModel? filtros)
+    {
+        static string? Texto(string? valor)
+        {
+            valor = valor?.Trim();
+            return string.IsNullOrEmpty(valor) ? null
+                : valor.Length > 120 ? valor[..120] : valor;
+        }
+
+        filtros ??= new DashboardFiltrosViewModel();
+        return new DashboardFiltrosViewModel
+        {
+            Provincia = Texto(filtros.Provincia),
+            Canton = Texto(filtros.Canton),
+            Distrito = Texto(filtros.Distrito),
+            Ruta = Texto(filtros.Ruta),
+            Anio = filtros.Anio,
+            Mes = filtros.Mes,
+            DiaSemana = filtros.DiaSemana,
+            FranjaHoraria = Texto(filtros.FranjaHoraria),
+            TipoAccidente = Texto(filtros.TipoAccidente),
+            Clima = Texto(filtros.Clima),
+            EstadoCalzada = Texto(filtros.EstadoCalzada),
+            Severidad = Texto(filtros.Severidad)
+        };
+    }
+
+    private static bool TieneFiltrosActivos(DashboardFiltrosViewModel filtros) =>
+        typeof(DashboardFiltrosViewModel).GetProperties()
+            .Any(propiedad => propiedad.GetValue(filtros) is not null);
+
+    private static BsonValue TextoOTodos(string? valor, string porDefecto = "Todos") =>
+        new BsonString(valor ?? porDefecto);
+
+    // Si hay selección se guarda el número (igual que en Incidencias);
+    // si no, la etiqueta "Todos".
+    private static BsonValue NumeroOTodos(int? valor) =>
+        valor.HasValue ? new BsonInt32(valor.Value) : new BsonString("Todos");
 
     private IMongoCollection<BsonDocument> ObtenerColeccion() =>
         mongoClient!.GetDatabase(configuracion["MongoDB:Database"])

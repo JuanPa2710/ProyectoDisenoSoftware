@@ -76,3 +76,9 @@ public sealed class DashboardRutaViewModel
     public int Cantidad { get; set; }
     public decimal PorcentajeAcumulado { get; set; }
 }
+
+public sealed class GuardarFiltrosRequest
+{
+    public string? Nombre { get; set; }
+    public DashboardFiltrosViewModel? Filtros { get; set; }
+}
