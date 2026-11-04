@@ -44,6 +44,16 @@ except (OSError, ValueError) as error:
 if not isinstance(reporte, dict):
     raise SystemExit("El reporte debe ser un objeto JSON.")
 
+# Lista cerrada: el reporte no puede elegir una colección arbitraria.
+colecciones = {
+    "accidentes_cosevi": "Incidencias",
+    "personas_cosevi": "PersonasAccidentes",
+}
+perfil = reporte.get("perfil")
+if not isinstance(perfil, str) or perfil not in colecciones:
+    raise SystemExit("Perfil desconocido. Volvé a procesar el archivo.")
+coleccion_destino = colecciones[perfil]
+
 campos_conteo = (
     "registros_leidos",
     "registros_aceptados",
@@ -119,7 +129,7 @@ with MongoClient(
     serverSelectionTimeoutMS=5000,
 ) as cliente:
     cliente.admin.command("ping")
-    coleccion = cliente["proyecto"]["Incidencias"]
+    coleccion = cliente["proyecto"][coleccion_destino]
 
     lote = []
     total = 0
@@ -197,7 +207,8 @@ with MongoClient(
         {
             "$set": {
                 "fuente": "COSEVI",
-                "coleccion_destino": "Incidencias",
+                "coleccion_destino": coleccion_destino,
+                "perfil": perfil,
                 "carpeta_json": str(carpeta),
                 "estado": "Importada",
                 "documentos_leidos": total,

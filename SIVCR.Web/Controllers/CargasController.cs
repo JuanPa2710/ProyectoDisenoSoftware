@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace SIVCR.Web.Controllers;
 
-public sealed class CargasController : Controller
+public sealed partial class CargasController : Controller
 {
     private readonly IHttpClientFactory _clientes;
 

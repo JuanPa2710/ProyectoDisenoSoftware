@@ -1,0 +1,52 @@
+@{
+    ViewData["Title"] = "Carga de varios archivos";
+}
+
+<section id="cargas-lote"
+         data-subir="@Url.Action("SubirLoteArchivo", "Cargas")"
+         data-procesar="@Url.Action("ProcesarLoteArchivo", "Cargas")"
+         data-importar="@Url.Action("ImportarLoteArchivo", "Cargas")"
+         data-reporte="@Url.Action("DescargarReporte", "Cargas")"
+         data-rechazados="@Url.Action("DescargarRechazados", "Cargas")">
+    <h1>Carga de varios archivos</h1>
+    <p>Seleccioná archivos de accidentes y personas. Se enviarán y procesarán
+       uno por uno. Revisá los reportes antes de confirmar la importación.</p>
+    <p>Máximo 10 archivos por selección y 50 MiB por archivo.
+       CSV UTF-8 o Windows-1252 separado por punto y coma, JSON o XLSX.</p>
+    <p>Los accidentes se guardan en Incidencias y las personas en PersonasAccidentes.
+       Se comparan estadísticas por lugar y período; no se asignan personas a accidentes individuales.</p>
+    <p><strong>Reimportar el mismo archivo como una carga nueva puede duplicar datos.</strong>
+       Para recuperar un fallo, usá los botones de este lote.</p>
+
+    <form id="lote-formulario">
+        @Html.AntiForgeryToken()
+        <label for="lote-archivos">Archivos</label>
+        <input id="lote-archivos" type="file" multiple accept=".csv,.json,.xlsx" />
+        <button type="submit">Subir y procesar pendientes</button>
+    </form>
+    <p id="lote-aviso" role="status" aria-live="polite"></p>
+    <div style="overflow-x:auto">
+        <table class="table">
+            <thead><tr>
+                <th>Archivo</th><th>Perfil</th><th>Aceptados</th>
+                <th>Rechazados</th><th>Estado</th><th>Reporte</th>
+            </tr></thead>
+            <tbody id="lote-resultados"></tbody>
+        </table>
+    </div>
+    <button id="lote-importar" type="button" disabled>
+        Confirmar importación de archivos válidos pendientes
+    </button>
+    <button id="lote-nuevo" type="button">Iniciar otro lote</button>
+    <p>Si una importación queda sin confirmación, verificá primero su estado.
+       Un reintento desde este lote conserva el identificador de la carga.</p>
+    <p>
+        <a asp-action="Index">Carga individual</a> ·
+        <a asp-controller="EstadisticasCosevi" asp-action="Index">Comparar estadísticas</a>
+    </p>
+    <noscript>Para varios archivos necesitás JavaScript. Podés usar la carga individual.</noscript>
+</section>
+
+@section Scripts {
+    <script src="~/js/cargas-lote.js" asp-append-version="true"></script>
+}

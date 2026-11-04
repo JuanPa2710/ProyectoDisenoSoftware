@@ -31,7 +31,10 @@ public sealed class ReporteCargaViewModel
     public long SinDiaSemana { get; set; }
 
     [JsonPropertyName("registros_sin_kilometro_numerico")]
-    public long SinKilometroNumerico { get; set; }
+    public long? SinKilometroNumerico { get; set; }
+
+    [JsonPropertyName("registros_sin_edad_numerica")]
+    public long? SinEdadNumerica { get; set; }
 
     [JsonPropertyName("registros_aceptados")]
     public long RegistrosAceptados { get; set; }

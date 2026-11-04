@@ -5,6 +5,8 @@ from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 import sys
 import csv
+import re
+import unicodedata
 import argparse
 from pyspark.sql.types import ArrayType, MapType, StructType
 from pathlib import Path
@@ -18,13 +20,13 @@ def rechazar_archivo(codigo, mensaje):
     raise SystemExit(2)
 
 parser = argparse.ArgumentParser(
-    description="Procesar accidentes de COSEVI con Spark."
+    description="Procesar accidentes o personas de COSEVI con Spark."
 )
 parser.add_argument(
     "--entrada",
     required=True,
     type=Path,
-    help="Ruta del archivo CSV, JSON o Excel (.xlsx)  de accidentes."
+    help="Ruta del archivo CSV, JSON o Excel (.xlsx) de COSEVI."
 )
 parser.add_argument(
     "--salida",
@@ -38,7 +40,7 @@ if not ruta_entrada.is_file():
     parser.error(f"No se encontró el archivo: {ruta_entrada}")
 
 # Columnas necesarias para transformar el perfil de accidentes COSEVI.
-columnas_requeridas = [
+columnas_accidentes = [
     "Clase de accidente",
     "Tipo de accidente",
     "Año",
@@ -62,34 +64,57 @@ columnas_requeridas = [
     "Mes",
 ]
 
+columnas_personas = [
+    "Rol", "Tipo de lesión", "Edad", "Sexo",
+    "Vehiculo en el que viajaba", "Año", "Provincia", "Cantón",
+    "Distrito", "Día", "Mes", "Edad quinquenal",
+]
+
+perfiles = {
+    "accidentes_cosevi": columnas_accidentes,
+    "personas_cosevi": columnas_personas,
+}
+
+
+def normalizar_encabezado(nombre):
+    nombre = unicodedata.normalize("NFC", nombre).lstrip("\ufeff")
+    return re.sub(r"\s+", " ", nombre).strip()
+
+
 def validar_columnas(nombres):
-    nombres = [nombre.strip() for nombre in nombres]
-
+    nombres = [normalizar_encabezado(nombre) for nombre in nombres]
     if not nombres or any(not nombre for nombre in nombres):
-        rechazar_archivo(
-            "COLUMNAS_INCORRECTAS",
-            "El archivo no contiene nombres de columnas válidos."
-        )
-
+        rechazar_archivo("COLUMNAS_INCORRECTAS", "Hay encabezados vacíos.")
     comparables = [nombre.casefold() for nombre in nombres]
-
     if len(comparables) != len(set(comparables)):
-        rechazar_archivo(
-            "COLUMNAS_INCORRECTAS",
-            "Hay nombres de columnas repetidos."
-        )
-
-    faltantes = [
-        nombre for nombre in columnas_requeridas
-        if nombre not in nombres
+        rechazar_archivo("COLUMNAS_INCORRECTAS", "Hay encabezados repetidos.")
+    coincidencias = [
+        perfil for perfil, columnas in perfiles.items()
+        if set(columnas).issubset(nombres)
     ]
-
-    if faltantes:
+    if len(coincidencias) != 1:
         rechazar_archivo(
             "COLUMNAS_INCORRECTAS",
-            "Faltan columnas del perfil COSEVI: "
-            + ", ".join(faltantes)
+            "Se requiere un único perfil COSEVI: accidentes o personas."
         )
+    perfil = coincidencias[0]
+    return perfil, perfiles[perfil]
+
+
+def detectar_codificacion_csv(ruta):
+    # Revisar todo el archivo: un encabezado ASCII no garantiza UTF-8.
+    for codificacion in ("utf-8-sig", "cp1252"):
+        try:
+            with ruta.open(encoding=codificacion, newline="") as entrada:
+                while entrada.read(1024 * 1024):
+                    pass
+            return codificacion
+        except UnicodeError:
+            continue
+    rechazar_archivo(
+        "COLUMNAS_INCORRECTAS",
+        "No se pudo leer el CSV como UTF-8 ni Windows-1252."
+    )
 
 
 def convertir_excel_a_csv(origen, destino):
@@ -181,14 +206,15 @@ if formato not in {".csv", ".json",".xlsx"}:
 # Revisar el encabezado original del CSV antes de que Spark lo lea.
 if formato == ".csv":
     try:
+        codificacion_csv = detectar_codificacion_csv(ruta_entrada)
         with ruta_entrada.open(
-            encoding="utf-8-sig", newline=""
+            encoding=codificacion_csv, newline=""
         ) as entrada:
             lector = csv.reader(entrada, delimiter=";", strict=True)
             encabezado = next(lector, None)
     except (UnicodeError, csv.Error):
         parser.error(
-            "Se requiere un CSV UTF-8 separado por punto y coma."
+            "Se requiere un CSV UTF-8 o Windows-1252 separado por punto y coma."
         )
     except OSError:
         parser.error("No se pudo abrir el archivo de entrada.")
@@ -215,6 +241,15 @@ temporal = None
 
 try:
     archivo = str(ruta_entrada)
+
+    if formato == ".csv" and codificacion_csv == "cp1252":
+        temporal = TemporaryDirectory(prefix="sivcr-csv-")
+        archivo_temporal = Path(temporal.name) / "entrada.csv"
+        with ruta_entrada.open(encoding="cp1252", newline="") as origen:
+            with archivo_temporal.open("w", encoding="utf-8", newline="") as destino:
+                while bloque := origen.read(1024 * 1024):
+                    destino.write(bloque)
+        archivo = str(archivo_temporal)
 
     if formato == ".xlsx":
         temporal = TemporaryDirectory(prefix="sivcr-excel-")
@@ -245,14 +280,10 @@ try:
             "El archivo no contiene registros para procesar."
         )
 
-    validar_columnas(datos.columns)
-
-    # Quitar espacios al inicio y al final de los encabezados.
-    datos = datos.toDF(*[nombre.strip() for nombre in datos.columns])
-
-
-
-    # Trabajar únicamente con las columnas de este perfil.
+    perfil, columnas_requeridas = validar_columnas(datos.columns)
+    datos = datos.toDF(*[
+        normalizar_encabezado(nombre) for nombre in datos.columns
+    ])
     datos = datos.select(*columnas_requeridas)
 
 
@@ -283,7 +314,9 @@ try:
         "Año", "Provincia", "Cantón", "Día", "Mes"
     ).show(5, truncate=False)
     # Revisar los valores y su frecuencia antes de transformarlos.
-    for campo in ["Año", "Mes", "Día", "Kilómetro"]:
+    campos_revision = ["Año", "Mes", "Día"]
+    campos_revision.append("Kilómetro" if perfil == "accidentes_cosevi" else "Edad")
+    for campo in campos_revision:
         print(f"\nVALORES DE: {campo}")
 
         datos.groupBy(campo).count().orderBy(
@@ -291,23 +324,27 @@ try:
         ).show(15, truncate=False)
 
 
-    # Conservar Kilómetro y crear una versión numérica aparte.
-    datos = datos.withColumn(
-        "kilometro_numero",
-        F.expr("try_cast(replace(`Kilómetro`, ',', '.') AS DOUBLE)")
-    )
+    if perfil == "accidentes_cosevi":
+        # Conservar Kilómetro y crear una versión numérica aparte.
+        datos = datos.withColumn(
+            "kilometro_numero",
+            F.expr("try_cast(replace(`Kilómetro`, ',', '.') AS DOUBLE)")
+        )
 
-    print("\nEJEMPLOS DE CONVERSIÓN:")
-    datos.select(
-        "Kilómetro", "kilometro_numero"
-    ).distinct().orderBy("Kilómetro").show(20, truncate=False)
+        print("\nEJEMPLOS DE CONVERSIÓN:")
+        datos.select(
+            "Kilómetro", "kilometro_numero"
+        ).distinct().orderBy("Kilómetro").show(20, truncate=False)
 
-    print("\nVALORES QUE NO SE PUDIERON CONVERTIR:")
-    datos.filter(
-        F.col("kilometro_numero").isNull()
-    ).groupBy("Kilómetro").count().orderBy(
-        F.desc("count")
-    ).show(30, truncate=False)
+        print("\nVALORES QUE NO SE PUDIERON CONVERTIR:")
+        datos.filter(
+            F.col("kilometro_numero").isNull()
+        ).groupBy("Kilómetro").count().orderBy(
+            F.desc("count")
+        ).show(30, truncate=False)
+
+    else:
+        datos = datos.withColumn("edad_numero", F.expr("try_cast(`Edad` AS INT)"))
 
     # Convertir el año a un número entero.
     datos = datos.withColumn(
@@ -422,43 +459,34 @@ try:
         "limón",
     ]
 
-    datos = datos.withColumn(
-        "primer_error",
-        F.coalesce(
-            fallo(
-                F.col("anio").isNull()
-                | ~F.col("anio").between(1900, anio_actual),
-                "Año",
-                f"Debe ser un año entero entre 1900 y {anio_actual}."
-            ),
-            fallo(
-                F.col("mes_numero").isNull(),
-                "Mes",
-                "El mes no pertenece al catálogo del perfil."
-            ),
-            fallo(
-                F.col("dia_semana_numero").isNull(),
-                "Día",
-                "El día de la semana no pertenece al catálogo."
-            ),
-            fallo(
-                esta_vacio("Provincia")
-                | ~F.lower(F.col("Provincia")).isin(provincias_validas),
-                "Provincia",
-                "Debe indicar una de las siete provincias de Costa Rica."
-            ),
-            fallo(
-                esta_vacio("Clase de accidente"),
-                "Clase de accidente",
-                "La clase de accidente es obligatoria."
-            ),
-            fallo(
-                esta_vacio("Tipo de accidente"),
-                "Tipo de accidente",
-                "El tipo de accidente es obligatorio."
-            )
+    validaciones = [
+        fallo(
+            F.col("anio").isNull() | ~F.col("anio").between(1900, anio_actual),
+            "Año", f"Debe ser un año entero entre 1900 y {anio_actual}."
+        ),
+        fallo(F.col("mes_numero").isNull(), "Mes", "Mes no reconocido."),
+        fallo(F.col("dia_semana_numero").isNull(), "Día", "Día no reconocido."),
+        fallo(
+            esta_vacio("Provincia") | ~F.lower(F.col("Provincia")).isin(provincias_validas),
+            "Provincia", "Debe indicar una de las siete provincias de Costa Rica."
+        ),
+    ]
+    if perfil == "accidentes_cosevi":
+        validaciones.extend([
+            fallo(esta_vacio("Clase de accidente"), "Clase de accidente", "La clase es obligatoria."),
+            fallo(esta_vacio("Tipo de accidente"), "Tipo de accidente", "El tipo es obligatorio."),
+        ])
+    else:
+        desconocida = esta_vacio("Edad") | (F.lower(F.col("Edad")) == "desconocida")
+        invalida = ~desconocida & (
+            ~F.col("Edad").rlike(r"^\d+$")
+            | F.col("edad_numero").isNull() | (F.col("edad_numero") < 0)
         )
-    )
+        for campo in ["Rol", "Tipo de lesión", "Sexo", "Vehiculo en el que viajaba"]:
+            validaciones.append(fallo(esta_vacio(campo), campo, "El campo es obligatorio."))
+        validaciones.append(fallo(invalida, "Edad", "Debe ser un entero no negativo o Desconocida."))
+
+    datos = datos.withColumn("primer_error", F.coalesce(*validaciones))
 
     print("\nRESUMEN DE VALIDACIÓN POR REGISTRO:")
     datos.select(
@@ -490,42 +518,65 @@ try:
 
 
     # Organizar los datos en documentos con campos agrupados.
-    documentos = validos.select(
-        F.lit("COSEVI").alias("fuente"),
+    if perfil == "accidentes_cosevi":
+        documentos = validos.select(
+            F.lit("COSEVI").alias("fuente"),
 
-        F.col("Clase de accidente").alias("clase_accidente"),
-        F.col("Tipo de accidente").alias("tipo_accidente"),
+            F.col("Clase de accidente").alias("clase_accidente"),
+            F.col("Tipo de accidente").alias("tipo_accidente"),
 
-        F.struct(
-            F.col("anio"),
-            F.col("mes_numero").alias("mes"),
-            F.col("dia_semana_numero").alias("dia_semana"),
-            F.col("Hora").alias("intervalo_hora")
-        ).alias("tiempo"),
+            F.struct(
+                F.col("anio"),
+                F.col("mes_numero").alias("mes"),
+                F.col("dia_semana_numero").alias("dia_semana"),
+                F.col("Hora").alias("intervalo_hora")
+            ).alias("tiempo"),
 
-        F.struct(
-            F.col("Provincia").alias("provincia"),
-            F.col("Cantón").alias("canton"),
-            F.col("Distrito").alias("distrito"),
-            F.col("Ruta").alias("ruta"),
-            F.col("kilometro_numero").alias("kilometro"),
-            F.col("Kilómetro").alias("kilometro_original")
-                ).alias("ubicacion"),
+            F.struct(
+                F.col("Provincia").alias("provincia"),
+                F.col("Cantón").alias("canton"),
+                F.col("Distrito").alias("distrito"),
+                F.col("Ruta").alias("ruta"),
+                F.col("kilometro_numero").alias("kilometro"),
+                F.col("Kilómetro").alias("kilometro_original")
+                    ).alias("ubicacion"),
 
-        F.struct(
-            F.col("Estado del tiempo").alias("clima"),
-            F.col("Estado de la calzada").alias("estado_calzada"),
-            F.col("Tipo de calzada").alias("tipo_calzada"),
-            F.col("Calzada vertical").alias("calzada_vertical"),
-            F.col("Calzada horizontal").alias("calzada_horizontal"),
-            F.col("Tipo de circulación").alias("tipo_circulacion"),
-            F.col("Rural o urbano").alias("zona")
-        ).alias("condiciones"),
+            F.struct(
+                F.col("Estado del tiempo").alias("clima"),
+                F.col("Estado de la calzada").alias("estado_calzada"),
+                F.col("Tipo de calzada").alias("tipo_calzada"),
+                F.col("Calzada vertical").alias("calzada_vertical"),
+                F.col("Calzada horizontal").alias("calzada_horizontal"),
+                F.col("Tipo de circulación").alias("tipo_circulacion"),
+                F.col("Rural o urbano").alias("zona")
+            ).alias("condiciones"),
 
-        F.col("Región Mideplan").alias("region_mideplan"),
-        F.col("Tipo ruta").alias("tipo_ruta"),
-        F.col("Hora recodificada").alias("franja_horaria")
-    )
+            F.col("Región Mideplan").alias("region_mideplan"),
+            F.col("Tipo ruta").alias("tipo_ruta"),
+            F.col("Hora recodificada").alias("franja_horaria")
+        )
+
+    else:
+        documentos = validos.select(
+            F.lit("COSEVI").alias("fuente"),
+            F.lit("personas_cosevi").alias("perfil"),
+            F.col("Rol").alias("rol"),
+            F.col("Tipo de lesión").alias("tipo_lesion"),
+            F.col("edad_numero").alias("edad"),
+            F.col("Edad").alias("edad_original"),
+            F.col("Sexo").alias("sexo"),
+            F.col("Vehiculo en el que viajaba").alias("vehiculo"),
+            F.col("Edad quinquenal").alias("edad_quinquenal"),
+            F.struct(
+                F.col("anio"), F.col("mes_numero").alias("mes"),
+                F.col("dia_semana_numero").alias("dia_semana")
+            ).alias("tiempo"),
+            F.struct(
+                F.col("Provincia").alias("provincia"),
+                F.col("Cantón").alias("canton"),
+                F.col("Distrito").alias("distrito")
+            ).alias("ubicacion")
+        )
 
     import json
     from datetime import datetime
@@ -629,12 +680,15 @@ try:
         F.col("dia_semana_numero").isNull()
     ).count()
 
-    sin_kilometro = datos.filter(
-        F.col("kilometro_numero").isNull()
-    ).count()
+    sin_kilometro = None
+    sin_edad = None
+    if perfil == "accidentes_cosevi":
+        sin_kilometro = datos.filter(F.col("kilometro_numero").isNull()).count()
+    else:
+        sin_edad = datos.filter(F.col("edad_numero").isNull()).count()
 
     reporte = {
-        "perfil": "accidentes_cosevi",
+        "perfil": perfil,
         "registros_leidos": total_leidos,
         "registros_aceptados": total_aceptados,
         "registros_rechazados": total_rechazados,
@@ -643,6 +697,7 @@ try:
         "registros_sin_anio_o_mes": sin_anio_mes,
         "registros_sin_dia_semana": sin_dia,
         "registros_sin_kilometro_numerico": sin_kilometro,
+        "registros_sin_edad_numerica": sin_edad,
         "errores_por_campo": errores_por_campo,
         "muestra_errores": muestra_errores,
         "carpeta_rechazados": (
@@ -652,7 +707,9 @@ try:
             "Cada registro rechazado informa únicamente su primer fallo.",
             "Solo los registros aceptados generan documentos importables.",
             "El día representa el día de la semana, no el día del mes.",
-            "Un kilómetro no numérico no implica descartar el accidente.",
+            ("Un kilómetro no numérico no implica descartar el accidente."
+             if perfil == "accidentes_cosevi" else
+             "Una edad vacía o Desconocida se conserva como null; las personas no se vinculan a accidentes individuales."),
             "Los indicadores de conversión pueden incluir un mismo registro."
         ]
     }

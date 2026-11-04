@@ -1,5 +1,9 @@
 # CU-01 — Carga y administración de datos
 
+> Ampliación: ver [Perfiles, carga múltiple y estadísticas](CargaDatos-PerfilesYLotes.md).
+> La descripción de accidentes y las verificaciones históricas que siguen corresponden
+> al módulo original; la ampliación documenta personas, Windows-1252 y lotes.
+
 ## Alcance
 Permite subir, procesar, revisar y confirmar la importación de
 archivos de accidentes con la estructura del perfil COSEVI.

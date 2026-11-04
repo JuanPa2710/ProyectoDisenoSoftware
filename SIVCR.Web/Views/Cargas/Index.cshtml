@@ -21,12 +21,18 @@
         ? "Pendiente"
         : Model.Reporte.SinAnioOMes == 0
             && Model.Reporte.SinDiaSemana == 0
-            && Model.Reporte.SinKilometroNumerico == 0
+            && (Model.Reporte.Perfil == "personas_cosevi"
+                ? Model.Reporte.SinEdadNumerica == 0
+                : Model.Reporte.SinKilometroNumerico == 0)
                 ? "Sin faltantes"
                 : "Revisar reporte";
 }
 
 <div class="cargas">
+    <p>
+        <a asp-controller="Cargas" asp-action="Lote">Cargar varios archivos</a>
+        · <a asp-controller="EstadisticasCosevi" asp-action="Index">Comparar accidentes y personas</a>
+    </p>
     <header>
         <p class="cargas__breadcrumb">
             Inicio / Administración / Carga de datos
@@ -84,7 +90,7 @@
                     </svg>
 
                     <label for="archivo">
-                        Seleccioná un archivo de accidentes de COSEVI
+                        Seleccioná un archivo COSEVI de accidentes o personas
                     </label>
 
                     <input type="file"
@@ -207,7 +213,7 @@
                         <strong>Validación de registros</strong>
                         <p class="cargas__ayuda">
                             Año, mes, día de semana, provincia,
-                            clase y tipo de accidente.
+                            los campos específicos del perfil detectado.
                         </p>
                     </div>
                     <span class="cargas__estado">
@@ -331,8 +337,8 @@
                             <td>@reporte.SinDiaSemana.ToString("N0")</td>
                         </tr>
                         <tr>
-                            <td>Sin kilómetro numérico</td>
-                            <td>@reporte.SinKilometroNumerico.ToString("N0")</td>
+                            <td>@(reporte.Perfil == "personas_cosevi" ? "Sin edad numérica" : "Sin kilómetro numérico")</td>
+                            @((reporte.Perfil == "personas_cosevi" ? reporte.SinEdadNumerica : reporte.SinKilometroNumerico)?.ToString("N0") ?? "No disponible")
                         </tr>
                     </tbody>
                 </table>
