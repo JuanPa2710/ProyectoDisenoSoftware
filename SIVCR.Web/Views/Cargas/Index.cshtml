@@ -287,7 +287,39 @@
 
             @if (reporte.RegistrosRechazados > 0)
             {
-                @if (reporte.Perfil == "red_vial_nacional")
+                <div class="cargas__tabla-contenedor">
+                    <table class="cargas__tabla">
+                        <caption>Primer fallo de los registros rechazados</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Campo</th>
+                                <th scope="col">Valor</th>
+                                <th scope="col">Problema</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var error in reporte.MuestraErrores)
+                            {
+                                <tr>
+                                    <td>@error.Campo</td>
+                                    <td>@(string.IsNullOrWhiteSpace(error.Valor)
+                                        ? "(vacío)" : error.Valor)</td>
+                                    <td>@error.Problema</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="cargas__ayuda">
+                    Mostrando @reporte.MuestraErrores.Count de
+                    @reporte.RegistrosRechazados.ToString("N0") registros rechazados.
+                    Cada registro informa únicamente su primer fallo.
+                    El reporte descargable incluye esta muestra y los conteos.
+                </p>
+            }
+
+            @if (reporte.Perfil == "red_vial_nacional")
             {
                 <p>Inventario vial · destino RedVial. Revisá las secciones aceptadas y rechazadas en el reporte.</p>
             }
@@ -324,38 +356,7 @@
                     comprobaciones. No equivalen a registros rechazados.
                 </p>
             }
-            }
 
-            <div class="cargas__tabla-contenedor">
-                <table class="cargas__tabla">
-                    <caption>Resultado de las conversiones</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">Comprobación</th>
-                            <th scope="col">Registros</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Sin año o mes numérico</td>
-                            <td>@reporte.SinAnioOMes.ToString("N0")</td>
-                        </tr>
-                        <tr>
-                            <td>Sin día de semana reconocido</td>
-                            <td>@reporte.SinDiaSemana.ToString("N0")</td>
-                        </tr>
-                        <tr>
-                            <td>@(reporte.Perfil == "personas_cosevi" ? "Sin edad numérica" : "Sin kilómetro numérico")</td>
-                                                        <td>@((reporte.Perfil == "personas_cosevi" ? reporte.SinEdadNumerica : reporte.SinKilometroNumerico)?.ToString("N0") ?? "No disponible")</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <p class="cargas__ayuda">
-                Estos conteos pueden incluir un mismo registro en varias
-                comprobaciones. No equivalen a registros rechazados.
-            </p>
 
             <ul class="cargas__notas">
                 @foreach (var nota in reporte.Notas)
