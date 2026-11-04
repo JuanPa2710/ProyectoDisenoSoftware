@@ -338,7 +338,7 @@
                         </tr>
                         <tr>
                             <td>@(reporte.Perfil == "personas_cosevi" ? "Sin edad numérica" : "Sin kilómetro numérico")</td>
-                            @((reporte.Perfil == "personas_cosevi" ? reporte.SinEdadNumerica : reporte.SinKilometroNumerico)?.ToString("N0") ?? "No disponible")</td>
+                                                        <td>@((reporte.Perfil == "personas_cosevi" ? reporte.SinEdadNumerica : reporte.SinKilometroNumerico)?.ToString("N0") ?? "No disponible")</td>
                         </tr>
                     </tbody>
                 </table>
