@@ -273,8 +273,8 @@ public sealed class CargaDatosService
             {
                 "SIVCR_VALIDACION:COLUMNAS_INCORRECTAS" =>
                     "El archivo no tiene los campos simples necesarios "
-                    + "de un perfil COSEVI: accidentes o personas. Revisá los nombres "
-                    + "de los campos. Si es CSV, usá punto y coma (;).",
+                    + "de un perfil admitido (accidentes, personas o red vial). "
+                    + "Revisá los encabezados y el separador del CSV.",
 
                 "SIVCR_VALIDACION:SIN_REGISTROS" =>
                     "El archivo contiene encabezados, pero no tiene "

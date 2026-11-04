@@ -48,6 +48,7 @@ if not isinstance(reporte, dict):
 colecciones = {
     "accidentes_cosevi": "Incidencias",
     "personas_cosevi": "PersonasAccidentes",
+    "red_vial_nacional": "RedVial",
 }
 perfil = reporte.get("perfil")
 if not isinstance(perfil, str) or perfil not in colecciones:
@@ -206,7 +207,7 @@ with MongoClient(
         {"_id": carga_id},
         {
             "$set": {
-                "fuente": "COSEVI",
+                "fuente": "Red Vial Nacional" if perfil == "red_vial_nacional" else "COSEVI",
                 "coleccion_destino": coleccion_destino,
                 "perfil": perfil,
                 "carpeta_json": str(carpeta),
