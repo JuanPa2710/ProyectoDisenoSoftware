@@ -1,0 +1,190 @@
+@model SIVCR.Web.Models.DashboardViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Dashboard";
+    var cultura = new CultureInfo("es-CR");
+    var filtrosActivos = new List<(string Nombre, string Valor)>
+    {
+        ("Provincia", Model.Filtros.Provincia ?? ""),
+        ("Cantón", Model.Filtros.Canton ?? ""),
+        ("Distrito", Model.Filtros.Distrito ?? ""),
+        ("Ruta", Model.Filtros.Ruta ?? ""),
+        ("Año", Model.Filtros.Anio?.ToString() ?? ""),
+        ("Mes", Model.Filtros.Mes.HasValue
+            ? cultura.DateTimeFormat.GetMonthName(Model.Filtros.Mes.Value)
+            : ""),
+        ("Día", Model.Filtros.DiaSemana.HasValue
+            ? new[] { "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado" }[Model.Filtros.DiaSemana.Value - 1]
+            : ""),
+        ("Franja", Model.Filtros.FranjaHoraria ?? ""),
+        ("Tipo de accidente", Model.Filtros.TipoAccidente ?? ""),
+        ("Clima", Model.Filtros.Clima ?? ""),
+        ("Calzada", Model.Filtros.EstadoCalzada ?? ""),
+        ("Severidad", Model.Filtros.Severidad ?? "")
+    }.Where(filtro => !string.IsNullOrWhiteSpace(filtro.Valor)).ToList();
+
+    string Formatear(int valor) => valor.ToString("N0", cultura);
+    string Porcentaje(decimal valor) => valor.ToString("N1", cultura) + " %";
+    string Mes(int mes) => cultura.DateTimeFormat.GetMonthName(mes);
+    string Dia(int dia) => new[] { "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado" }[dia - 1];
+}
+
+<section class="dashboard" aria-labelledby="dashboard-title">
+  <header class="dashboard__heading">
+    <div><p class="dashboard__breadcrumb">Inicio / Dashboard</p><h1 id="dashboard-title">Dashboard de siniestralidad vial</h1></div>
+    <div class="dashboard__actions">
+      <button id="btn-guardar-filtros" class="sivcr-button sivcr-button--secondary" type="button">Guardar filtros</button>
+      <a asp-controller="Explorador"
+         asp-action="Index"
+         asp-route-Filtros.Provincia="@Model.Filtros.Provincia"
+         asp-route-Filtros.Canton="@Model.Filtros.Canton"
+         asp-route-Filtros.Distrito="@Model.Filtros.Distrito"
+         asp-route-Filtros.Ruta="@Model.Filtros.Ruta"
+         asp-route-Filtros.Anio="@Model.Filtros.Anio"
+         asp-route-Filtros.Mes="@Model.Filtros.Mes"
+         asp-route-Filtros.DiaSemana="@Model.Filtros.DiaSemana"
+         asp-route-Filtros.FranjaHoraria="@Model.Filtros.FranjaHoraria"
+         asp-route-Filtros.TipoAccidente="@Model.Filtros.TipoAccidente"
+         asp-route-Filtros.Clima="@Model.Filtros.Clima"
+         asp-route-Filtros.EstadoCalzada="@Model.Filtros.EstadoCalzada"
+         asp-route-Filtros.Severidad="@Model.Filtros.Severidad"
+         class="sivcr-button sivcr-button--primary">
+        Ver registros y exportar
+      </a>
+    </div>
+  </header>
+
+  @if (!string.IsNullOrWhiteSpace(Model.ErrorMongoDB))
+  {
+    <div class="dashboard-message dashboard-message--error" role="alert">@Model.ErrorMongoDB</div>
+  }
+
+  <div id="guardar-filtros-aviso" class="dashboard-message" role="status" hidden></div>
+
+  <style>
+    .dashboard-message--ok { border-color: #3f8f63; background: #1f3d2d; color: #d6f5e3; }
+    .save-filters-dialog { width: min(420px, calc(100vw - 32px)); padding: 16px; border: 1px solid var(--sivcr-border); border-radius: 8px; background: var(--sivcr-surface); color: var(--sivcr-text); box-shadow: 0 8px 24px rgb(0 0 0 / 45%); font-family: "Open Sans", Arial, sans-serif; }
+    .save-filters-dialog::backdrop { background: rgb(0 0 0 / 60%); }
+    .save-filters-dialog input[type="text"] { box-sizing: border-box; width: 100%; height: 36px; padding: 0 8px; border: 1px solid var(--sivcr-input-border); border-radius: 4px; background: var(--sivcr-surface); color: #fff; font: 400 14px/20px "Open Sans", Arial, sans-serif; }
+    .save-filters-dialog input[type="text"]::placeholder { color: var(--sivcr-text-muted); }
+    .save-filters-dialog input[type="text"]:focus { outline: 2px solid var(--sivcr-accent); outline-offset: 0; border-color: var(--sivcr-accent); }
+    .save-filters-dialog__error { margin: 10px 0 0; color: #ffb3b3; font-size: 13px; line-height: 18px; }
+    .save-filters-dialog__error[hidden], .dashboard-message[hidden] { display: none; }
+    .save-filters-dialog__actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 16px; }
+  </style>
+
+  <dialog id="dialogo-guardar-filtros" class="dashboard-card save-filters-dialog" aria-labelledby="save-filters-title">
+    <form method="post" asp-action="GuardarFiltros" id="form-guardar-filtros">
+      <h2 id="save-filters-title" class="dashboard-card__title"><svg class="dashboard-card__title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg>Guardar combinación de filtros</h2>
+      <label class="filter-field"><span>Nombre de la combinación</span>
+        <input type="text" id="nombre-filtros" maxlength="80" required placeholder="Ej. Lluvia en Ruta 32" />
+      </label>
+      <p id="guardar-filtros-error" class="save-filters-dialog__error" role="alert" hidden></p>
+      <div class="save-filters-dialog__actions">
+        <button type="button" id="cancelar-guardar-filtros" class="text-button">Cancelar</button>
+        <button type="submit" class="sivcr-button sivcr-button--primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <form class="dashboard-card dashboard-filters" method="get" aria-labelledby="filters-title">
+    <h2 id="filters-title" class="dashboard-card__title"><svg class="dashboard-card__title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg>Filtros multidimensionales</h2>
+    <div class="filter-grid">
+      <label class="filter-field"><span>Provincia</span><select asp-for="Filtros.Provincia"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Provincias) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Cantón</span><select asp-for="Filtros.Canton"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Cantones) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Distrito</span><select asp-for="Filtros.Distrito"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Distritos) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Ruta</span><select asp-for="Filtros.Ruta"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Rutas) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Año</span><select asp-for="Filtros.Anio"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Anios) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Mes</span><select asp-for="Filtros.Mes"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Meses) { <option value="@valor">@Mes(valor)</option> }</select></label>
+      <label class="filter-field"><span>Día de la semana</span><select asp-for="Filtros.DiaSemana"><option value="">Todos</option>@foreach (var valor in Model.Opciones.DiasSemana) { <option value="@valor">@Dia(valor)</option> }</select></label>
+      <label class="filter-field"><span>Franja horaria</span><select asp-for="Filtros.FranjaHoraria"><option value="">Todas</option>@foreach (var valor in Model.Opciones.FranjasHorarias) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Tipo de accidente</span><select asp-for="Filtros.TipoAccidente"><option value="">Todos</option>@foreach (var valor in Model.Opciones.TiposAccidente) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Condición climática</span><select asp-for="Filtros.Clima"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Climas) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Estado de calzada</span><select asp-for="Filtros.EstadoCalzada"><option value="">Todos</option>@foreach (var valor in Model.Opciones.EstadosCalzada) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Severidad</span><select asp-for="Filtros.Severidad"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Severidades) { <option value="@valor">@valor</option> }</select></label>
+      <div class="filter-field filter-field--unavailable"><span>Género</span><div class="filter-unavailable">No disponible</div></div>
+      <div class="filter-field filter-field--unavailable"><span>Rango de edad</span><div class="filter-unavailable">No disponible</div></div>
+    </div>
+    <div class="active-filters">
+      <div class="active-filters__items">
+        <span>Filtros activos:</span>
+        @if (filtrosActivos.Count == 0) { <span class="active-filters__empty">Ninguno</span> }
+        @foreach (var filtro in filtrosActivos) { <span class="filter-chip">@filtro.Nombre: @filtro.Valor</span> }
+      </div>
+      <div class="filter-actions"><a asp-action="Index" class="text-button">Limpiar todo</a><button type="submit" class="sivcr-button sivcr-button--primary">Aplicar filtros</button></div>
+    </div>
+  </form>
+
+  <section class="kpi-grid" aria-label="Indicadores principales">
+    @foreach (var kpi in Model.Indicadores)
+    {
+      <article class="dashboard-card kpi-card"><h2>@kpi.Titulo</h2><p class="kpi-card__value">@kpi.Valor</p><p class="kpi-card__detail">@kpi.Detalle</p><p class="kpi-card__formula">@kpi.Formula</p></article>
+    }
+  </section>
+
+  <section class="chart-grid" aria-label="Visualizaciones de siniestralidad vial">
+    <article class="dashboard-card chart-card geographic-card">
+      <header class="chart-card__header"><h2>Distribución geográfica</h2><span>Incidentes por provincia</span></header>
+      <div class="geographic-card__content">
+        <div class="map-placeholder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16m6-14v16" /></svg><span>Mapa coroplético por provincia<br />pendiente de capa geográfica</span></div>
+        <div class="province-ranking">
+          @if (Model.Provincias.Count == 0) { <p class="dashboard-empty">No hay incidentes para los filtros seleccionados.</p> }
+          @foreach (var provincia in Model.Provincias) { <div class="bar-row"><span>@provincia.Etiqueta</span><div class="bar-track"><i style="width: @provincia.Porcentaje%"></i></div><strong>@Formatear(provincia.Cantidad)</strong></div> }
+        </div>
+      </div>
+    </article>
+
+    <article class="dashboard-card chart-card temporal-card">
+      <header class="chart-card__header"><h2>Matriz temporal</h2><span>Día de la semana × franja horaria</span></header>
+      @if (Model.FranjasMatriz.Count == 0) { <p class="dashboard-empty">No hay franjas horarias para los filtros seleccionados.</p> }
+      else
+      {
+        var maximo = Math.Max(1, Model.MatrizTemporal.SelectMany(fila => fila.Valores).DefaultIfEmpty().Max());
+        <div class="heatmap" style="grid-template-columns:44px repeat(@Model.FranjasMatriz.Count, 1fr)">
+          <div></div>@foreach (var franja in Model.FranjasMatriz) { <b>@franja</b> }
+          @foreach (var fila in Model.MatrizTemporal) { <b>@fila.Dia</b>@foreach (var valor in fila.Valores) { var nivel = valor == 0 ? "heat-0" : valor <= maximo * .25 ? "heat-1" : valor <= maximo * .5 ? "heat-2" : valor <= maximo * .75 ? "heat-3" : "heat-4"; <span class="@nivel">@valor</span> } }
+        </div>
+        <div class="heatmap-legend"><span>Menos</span><i></i><i></i><i></i><i></i><i></i><span>Más</span></div>
+      }
+    </article>
+
+    <article class="dashboard-card chart-card vehicle-card">
+      <header class="chart-card__header"><h2>Tipo de accidente registrado</h2><span>% de incidentes</span></header>
+      <div class="vehicle-card__content">
+        <div class="donut" style="background: @Model.TipoAccidenteDonutCss"><div><strong>@Formatear(Model.TotalIncidentes)</strong><span>incidentes</span></div></div>
+        <ul class="chart-legend">
+          @if (Model.TiposAccidente.Count == 0) { <li class="dashboard-empty">No hay datos para mostrar.</li> }
+          @foreach (var tipo in Model.TiposAccidente.Select((dato, indice) => new { dato, indice })) { <li><i class="legend-@((tipo.indice % 5) + 1)"></i><span>@tipo.dato.Etiqueta</span><b>@Porcentaje(tipo.dato.Porcentaje)</b></li> }
+        </ul>
+      </div>
+    </article>
+
+    <article class="dashboard-card chart-card demographic-card">
+      <header class="chart-card__header"><h2>Perfil demográfico de víctimas</h2></header>
+      <div class="dashboard-unavailable"><strong>Dato no disponible</strong><span>La fuente actual no registra víctimas, género ni edades.</span></div>
+    </article>
+
+    <article class="dashboard-card chart-card severity-card">
+      <header class="chart-card__header"><h2>Severidad de los siniestros</h2><span>Distribución por clase de accidente</span></header>
+      <div class="severity-card__content">
+        <div class="pie" style="background: @Model.SeveridadPieCss"></div>
+        <div class="severity-kpis">
+          @if (Model.Severidades.Count == 0) { <p class="dashboard-empty">No hay datos para mostrar.</p> }
+          @foreach (var severidad in Model.Severidades.Select((dato, indice) => new { dato, indice })) { <div><span><i class="severity-@((severidad.indice % 4) + 1)"></i>@severidad.dato.Etiqueta</span><strong>@Formatear(severidad.dato.Cantidad)</strong><small>@Porcentaje(severidad.dato.Porcentaje) de los incidentes</small></div> }
+        </div>
+      </div>
+    </article>
+
+    <article class="dashboard-card chart-card routes-card">
+      <header class="chart-card__header"><h2>Rutas con más incidentes</h2><span>Barras = incidentes, última columna = % acumulado</span></header>
+      <div class="routes-list">
+        @if (Model.Rutas.Count == 0) { <p class="dashboard-empty">No hay rutas para los filtros seleccionados.</p> }
+        @foreach (var ruta in Model.Rutas) { var ancho = Model.Rutas[0].Cantidad == 0 ? 0 : ruta.Cantidad * 100m / Model.Rutas[0].Cantidad; <div class="route-row"><span>@ruta.Ruta</span><div class="route-row__track"><i style="width: @ancho%"></i></div><strong>@Formatear(ruta.Cantidad)</strong><em>@Porcentaje(ruta.PorcentajeAcumulado)</em></div> }
+      </div>
+    </article>
+  </section>
+</section>
+
+@section Scripts {
+    <script src="~/js/dashboard-filtros.js" asp-append-version="true"></script>
+}

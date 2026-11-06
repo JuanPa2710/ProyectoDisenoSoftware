@@ -1,0 +1,394 @@
+@model SIVCR.Web.Models.FiltrosGuardadosViewModel
+@* Views/Home/FiltrosGuardados.cshtml *@
+@{
+    ViewData["Title"] = "Filtros Guardados e Historial";
+}
+
+@* Bloque de estilos específicos para esta vista para igualar el diseño de referencia *@
+<style>
+    /* Estilos generales para el fondo y texto */
+    body {
+        background-color: #121212; /* Fondo muy oscuro */
+        color: #e0e0e0;
+        font-family: 'Open Sans', sans-serif;
+    }
+
+    /* Títulos y Breadcrumb */
+    .sivcr-page-title {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .sivcr-breadcrumb {
+        font-size: 0.85rem;
+        color: #888;
+        margin-bottom: 2rem;
+    }
+
+    /* Estilos de las "Cards" (secciones) */
+    .sivcr-card {
+        background-color: #1e1e1e; /* Fondo de la card ligeramente más claro */
+        border: 1px solid #333;
+        border-radius: 4px;
+        margin-bottom: 1.5rem;
+        padding: 1.5rem;
+    }
+
+    .sivcr-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #333;
+        padding-bottom: 0.5rem;
+    }
+
+    .sivcr-card-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .sivcr-card-subtitle {
+        font-size: 0.85rem;
+        color: #888;
+    }
+
+    /* Sección de Guardar Combinación Actual */
+    .sivcr-save-form {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-end;
+    }
+
+    .sivcr-form-group {
+        flex-grow: 1;
+    }
+
+    .sivcr-label {
+        display: block;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+        color: #aaa;
+    }
+
+    .sivcr-input {
+        width: 100%;
+        background-color: #2a2a2a;
+        border: 1px solid #444;
+        color: #e0e0e0;
+        padding: 0.5rem;
+        border-radius: 4px;
+    }
+
+    /* Botones */
+    .sivcr-btn {
+        padding: 0.5rem 1.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+    }
+
+    .sivcr-btn-primary {
+        background-color: #0056b3; /* Azul oscuro */
+        color: white;
+    }
+
+    .sivcr-btn-primary:hover {
+        background-color: #004494;
+    }
+
+    .sivcr-btn-outline-light {
+        background-color: transparent;
+        border: 1px solid #ccc;
+        color: #ccc;
+    }
+
+    .sivcr-btn-outline-light:hover {
+        background-color: rgba(255,255,255,0.1);
+        color: white;
+    }
+
+    /* Badges (Etiquetas de filtros) */
+    .sivcr-badge-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .sivcr-badge {
+        background-color: rgba(0, 86, 179, 0.2); /* Azul traslúcido */
+        color: #80bfff; /* Azul claro */
+        border: 1px solid rgba(0, 86, 179, 0.5);
+        padding: 0.25rem 0.75rem;
+        border-radius: 16px;
+        font-size: 0.8rem;
+    }
+
+    /* Lista de Combinaciones Guardadas */
+    .sivcr-saved-item {
+        border-bottom: 1px solid #333;
+        padding: 1rem 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .sivcr-saved-item:last-child {
+        border-bottom: none;
+    }
+
+    .sivcr-saved-item-content {
+        flex-grow: 1;
+    }
+
+    .sivcr-saved-item-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .sivcr-saved-item-meta {
+        font-size: 0.85rem;
+        color: #888;
+    }
+
+    .sivcr-saved-item-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .sivcr-action-delete {
+        color: #ff6b6b; /* Rojo suave */
+        text-decoration: none;
+        font-size: 0.9rem;
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    /* Tabla de Historial */
+    .sivcr-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .sivcr-table th, .sivcr-table td {
+        text-align: left;
+        padding: 0.75rem;
+        border-bottom: 1px solid #333;
+    }
+
+    .sivcr-table th {
+        color: #aaa;
+        font-weight: 400;
+    }
+
+    .sivcr-table tbody tr:hover {
+        background-color: rgba(255,255,255,0.03);
+    }
+
+    .sivcr-action-repeat {
+        color: #80bfff;
+        text-decoration: none;
+    }
+
+    .sivcr-empty {
+        color: #888;
+        font-size: 0.9rem;
+        padding: 1rem 0;
+    }
+
+    .sivcr-ok {
+        background-color: #1f3d2d;
+        border: 1px solid #3f8f63;
+        color: #d6f5e3;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .sivcr-error {
+        background-color: #4a2323;
+        border: 1px solid #b95050;
+        color: #ffd9d9;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.5rem;
+    }
+    /* Diálogo de confirmación: mismo aspecto que "Guardar combinación de filtros" */
+    .delete-filter-dialog { width: min(420px, calc(100vw - 32px)); padding: 16px; border: 1px solid var(--sivcr-border); border-radius: 8px; background: var(--sivcr-surface); color: var(--sivcr-text); box-shadow: 0 8px 24px rgb(0 0 0 / 45%); font-family: "Open Sans", Arial, sans-serif; }
+    .delete-filter-dialog::backdrop { background: rgb(0 0 0 / 60%); }
+    .delete-filter-dialog p { margin: 0; color: var(--sivcr-text-soft); font-size: 14px; line-height: 20px; }
+    .delete-filter-dialog strong { color: #fff; font-weight: 600; }
+    .delete-filter-dialog__actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 16px; }
+</style>
+
+@* Estructura HTML principal *@
+<div class="container-fluid px-4">
+    <div class="sivcr-breadcrumb">Inicio / Filtros guardados</div>
+    <h1 class="sivcr-page-title">Filtros guardados e historial</h1>
+
+    @* SECCIÓN 1: GUARDAR LA COMBINACIÓN ACTUAL *@
+    <div class="sivcr-card">
+        <div class="sivcr-card-header">
+            <h2 class="sivcr-card-title">Guardar la combinación actual</h2>
+            <span class="sivcr-card-subtitle">Filtros activos en el dashboard</span>
+        </div>
+        
+        <div class="sivcr-save-form">
+            <div class="sivcr-form-group">
+                <label class="sivcr-label">Filtros que se guardarán</label>
+                <div class="sivcr-badge-container">
+                    <span class="sivcr-badge">Año: 2025</span>
+                    <span class="sivcr-badge">Tipo de ruta: Nacional</span>
+                </div>
+            </div>
+            
+            <div class="sivcr-form-group" style="flex-grow: 2;">
+                <label class="sivcr-label" for="txtNombreCombinacion">Nombre de la combinación</label>
+                <input type="text" id="txtNombreCombinacion" class="sivcr-input" placeholder="Ej. Motocicletas de noche en la GAM">
+            </div>
+            
+            <button type="button" class="sivcr-btn sivcr-btn-primary">Guardar</button>
+        </div>
+    </div>
+
+    @* SECCIÓN 2: COMBINACIONES GUARDADAS (colección "filtros" de MongoDB) *@
+    @if (!string.IsNullOrWhiteSpace(Model.Mensaje))
+    {
+        <div class="sivcr-ok" role="status">@Model.Mensaje</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMongoDB))
+    {
+        <div class="sivcr-error" role="alert">@Model.ErrorMongoDB</div>
+    }
+
+    <div class="sivcr-card">
+        <div class="sivcr-card-header">
+            <h2 class="sivcr-card-title">Combinaciones guardadas</h2>
+            <span class="sivcr-card-subtitle">@Model.Filtros.Count @(Model.Filtros.Count == 1 ? "guardada" : "guardadas")</span>
+        </div>
+
+        @if (Model.Filtros.Count == 0)
+        {
+            <div class="sivcr-empty">Aún no hay combinaciones guardadas. Guarda una desde el Dashboard con el botón «Guardar filtros».</div>
+        }
+
+        @foreach (var filtro in Model.Filtros)
+        {
+            <div class="sivcr-saved-item">
+                <div class="sivcr-saved-item-content">
+                    <div class="sivcr-saved-item-title">@filtro.Nombre</div>
+                    <div class="sivcr-badge-container">
+                        @if (filtro.Etiquetas.Count == 0)
+                        {
+                            <span class="sivcr-badge">Sin filtros</span>
+                        }
+                        @foreach (var etiqueta in filtro.Etiquetas)
+                        {
+                            <span class="sivcr-badge">@etiqueta.Nombre: @etiqueta.Valor</span>
+                        }
+                    </div>
+                    <div class="sivcr-saved-item-meta">Registros: @filtro.TotalRegistros@(string.IsNullOrEmpty(filtro.Fecha) ? "" : $" · guardada el {filtro.Fecha}")</div>
+                </div>
+                <div class="sivcr-saved-item-actions">
+                    <a asp-controller="Home" asp-action="Index" asp-all-route-data="filtro.Parametros" class="sivcr-btn sivcr-btn-outline-light">Aplicar</a>
+                    <button type="button" class="sivcr-action-delete" data-eliminar-id="@filtro.Id" data-eliminar-nombre="@filtro.Nombre">✕ Eliminar</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* SECCIÓN 3: HISTORIAL DE CONSULTAS *@
+    <div class="sivcr-card">
+        <div class="sivcr-card-header">
+            <h2 class="sivcr-card-title">Historial de consultas</h2>
+            <span class="sivcr-card-subtitle">Últimas 5 consultas</span>
+        </div>
+
+        <table class="sivcr-table">
+            <thead>
+                <tr>
+                    <th>Fecha y hora</th>
+                    <th>Filtros aplicados</th>
+                    <th style="text-align: right;">Resultados</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>03/10/2026 09:42</td>
+                    <td>Año: 2025 · Tipo de ruta: Nacional</td>
+                    <td style="text-align: right;">10 610</td>
+                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
+                </tr>
+                <tr>
+                    <td>02/10/2026 16:15</td>
+                    <td>Provincia: San José · Cantón: Escazú · Tipo de vehículo: Bicicleta</td>
+                    <td style="text-align: right;">0</td>
+                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
+                </tr>
+                <tr>
+                    <td>02/10/2026 11:03</td>
+                    <td>Ruta: 32 - Clima: Lluvia · Estado de calzada: Húmeda</td>
+                    <td style="text-align: right;">486</td>
+                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
+                </tr>
+                <tr>
+                    <td>01/10/2026 18:27</td>
+                    <td>Franja horaria: Noche · Tipo de vehículo: Motocicleta</td>
+                    <td style="text-align: right;">2 973</td>
+                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
+                </tr>
+                <tr>
+                    <td>30/09/2026 08:50</td>
+                    <td>Sin filtros</td>
+                    <td style="text-align: right;">10 610</td>
+                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<dialog id="dialogo-eliminar-filtro" class="dashboard-card delete-filter-dialog" aria-labelledby="delete-filter-title">
+    <form method="post" asp-controller="Home" asp-action="EliminarFiltro">
+        <h2 id="delete-filter-title" class="dashboard-card__title"><svg class="dashboard-card__title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>Eliminar combinación</h2>
+        <p>¿Seguro que deseas eliminar «<strong id="eliminar-filtro-nombre"></strong>»? Esta acción no se puede deshacer.</p>
+        <input type="hidden" name="id" id="eliminar-filtro-id" />
+        <div class="delete-filter-dialog__actions">
+            <button type="button" id="cancelar-eliminar-filtro" class="text-button">Cancelar</button>
+            <button type="submit" class="sivcr-button sivcr-button--primary">Eliminar</button>
+        </div>
+    </form>
+</dialog>
+
+@section Scripts {
+    <script>
+        (() => {
+            const dialogo = document.getElementById("dialogo-eliminar-filtro");
+            const campoId = document.getElementById("eliminar-filtro-id");
+            const campoNombre = document.getElementById("eliminar-filtro-nombre");
+
+            document.querySelectorAll("[data-eliminar-id]").forEach(boton => {
+                boton.addEventListener("click", () => {
+                    campoId.value = boton.dataset.eliminarId;
+                    campoNombre.textContent = boton.dataset.eliminarNombre;
+                    dialogo.showModal();
+                });
+            });
+
+            document.getElementById("cancelar-eliminar-filtro")
+                .addEventListener("click", () => dialogo.close());
+        })();
+    </script>
+}
