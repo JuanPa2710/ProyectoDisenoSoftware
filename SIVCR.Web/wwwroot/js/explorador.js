@@ -1,10 +1,37 @@
 (function () {
     const datosElemento = document.getElementById("datos_registros");
-    const todos = JSON.parse(datosElemento.textContent);
+    const consulta = JSON.parse(datosElemento.textContent);
+    let todos = [];
+    if (consulta.Filas !== null && consulta.Filas !== undefined) {
+        todos = consulta.Filas;
+    } else if (consulta.filas !== null && consulta.filas !== undefined) {
+        todos = consulta.filas;
+    }
+
+    let columnas = [];
+    if (consulta.Columnas !== null && consulta.Columnas !== undefined) {
+        columnas = consulta.Columnas;
+    } else if (consulta.columnas !== null && consulta.columnas !== undefined) {
+        columnas = consulta.columnas;
+    }
+
+    let coleccion = "";
+    if (consulta.Coleccion !== null && consulta.Coleccion !== undefined) {
+        coleccion = consulta.Coleccion;
+    } else if (consulta.coleccion !== null && consulta.coleccion !== undefined) {
+        coleccion = consulta.coleccion;
+    }
     
     //estado de columna actual
     let filtrados = [...todos];
-    let ordenCampo = "Fecha";
+    let ordenCampo = "";
+    if (columnas.length > 0) {
+        if (columnas[0].Campo !== null && columnas[0].Campo !== undefined) {
+            ordenCampo = columnas[0].Campo;
+        } else if (columnas[0].campo !== null && columnas[0].campo !== undefined) {
+            ordenCampo = columnas[0].campo;
+        }
+    }
     let ascendente = false;
     let pagina = 1;
     const porPagina = 10;
@@ -21,6 +48,47 @@
     const contenido = document.getElementById("contenido_tabla");
     const error = document.getElementById("estado_error");
     const detalleOrden = document.getElementById("detalle_orden");
+
+    function campoColumna(columna) {
+        if (columna.Campo !== null && columna.Campo !== undefined) {
+            return columna.Campo;
+        }
+        return columna.campo;
+    }
+
+    function etiquetaColumna(columna) {
+        if (columna.Etiqueta !== null && columna.Etiqueta !== undefined) {
+            return columna.Etiqueta;
+        }
+        return columna.etiqueta;
+    }
+
+    function prepararEncabezados() {
+        const filaEncabezados = document.querySelector(".explorador_tabla thead tr");
+        const menuColumnas = document.getElementById("menu_columnas");
+        filaEncabezados.innerHTML = columnas.map((columna, indice) => `
+            <th scope="col" data-column-index="${indice}">
+                <button type="button" data-sort="${campoColumna(columna)}">
+                    ${escapar(etiquetaColumna(columna))}
+                    <span class="orden"></span>
+                </button>
+            </th>
+        `).join("");
+
+        menuColumnas.innerHTML = columnas.map((columna, indice) => `
+            <label>
+                <input type="checkbox" data-column="${indice}" checked />
+                ${escapar(etiquetaColumna(columna))}
+            </label>
+        `).join("");
+
+        document.querySelector(".explorador_tabla").setAttribute(
+            "aria-label",
+            `Registros de ${coleccion}`
+        );
+    }
+
+    prepararEncabezados();
 
     // asignar color según severidad
     function claseSeveridad(valor) {
@@ -43,7 +111,11 @@
         // ordena una copia de los registros, sin modificar la fuente original.
         filtrados.sort((a, b) => {
             const resultado = String(a[ordenCampo]).localeCompare(String(b[ordenCampo]), "es", { numeric: true });
-            return ascendente ? resultado : -resultado;
+            if (ascendente) {
+                return resultado;
+            } else {
+                return -resultado;
+            }
         });
 
         const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
@@ -53,22 +125,22 @@
 
         filas.innerHTML = registrosPagina.map((registro) => `
             <tr>
-                <td><strong>${escapar(registro.Id)}</strong></td>
-                <td>${escapar(registro.Fecha)}</td>
-                <td>${escapar(registro.Hora)}</td>
-                <td>${escapar(registro.Provincia)}</td>
-                <td>${escapar(registro.Canton)}</td>
-                <td>${escapar(registro.Ruta)}</td>
-                <td>${escapar(registro.Vehiculo)}</td>
-                <td>${escapar(registro.Franja)}</td>
-                <td>${escapar(registro.Clima)}</td>
-                <td>${escapar(registro.Calzada)}</td>
-                <td>${escapar(registro.Tpr)}</td>
-                <td><span class="explorador_severidad ${claseSeveridad(registro.Severidad)}">${escapar(registro.Severidad)}</span></td>
+                ${columnas.map((columna) => {
+                    const campo = campoColumna(columna);
+                    let valor = "";
+                    if (registro[campo] !== null && registro[campo] !== undefined) {
+                        valor = registro[campo];
+                    }
+                    return `<td>${escapar(valor)}</td>`;
+                }).join("")}
             </tr>
         `).join("");
 
-        totalConsulta.textContent = `${filtrados.length} registro${filtrados.length === 1 ? "" : "s"} encontrados`;
+        let etiquetaRegistros = " registros";
+        if (filtrados.length === 1) {
+            etiquetaRegistros = " registro";
+        }
+        totalConsulta.textContent = `${filtrados.length}${etiquetaRegistros} encontrados`;
         const hayResultados = filtrados.length > 0;
         sinResultados.hidden = hayResultados;
         tablaContenedor.hidden = !hayResultados;
@@ -88,7 +160,11 @@
             const boton = document.createElement("button");
             boton.type = "button";
             boton.textContent = numero;
-            boton.className = numero === pagina ? "activa" : "";
+            if (numero === pagina) {
+                boton.className = "activa";
+            } else {
+                boton.className = "";
+            }
             boton.addEventListener("click", () => {
                 pagina = numero;
                 renderizar();
@@ -96,8 +172,12 @@
             numeros.appendChild(boton);
         }
 
+        let etiquetaCantidad = " registros";
+        if (filtrados.length === 1) {
+            etiquetaCantidad = " registro";
+        }
         document.getElementById("cantidad_exportar").textContent =
-            `${filtrados.length} registro${filtrados.length === 1 ? "" : "s"}`;
+            `${filtrados.length}${etiquetaCantidad}`;
     }
 
     // para ordenar la tabla
@@ -110,25 +190,43 @@
                 ascendente = true;
             }
             document.querySelectorAll(".orden").forEach((indicador) => indicador.textContent = "");
-            boton.querySelector(".orden").textContent = ascendente ? " ▲" : " ▼";
+            if (ascendente) {
+                boton.querySelector(".orden").textContent = " ▲";
+            } else {
+                boton.querySelector(".orden").textContent = " ▼";
+            }
             const nombre = boton.textContent.trim().replace(/[▲▼]/, "").trim();
-            detalleOrden.textContent = `Orden: 1) ${nombre} ${ascendente ? "ascendente" : "descendente"}`;
+            if (ascendente) {
+                detalleOrden.textContent = `Orden: 1) ${nombre} ascendente`;
+            } else {
+                detalleOrden.textContent = `Orden: 1) ${nombre} descendente`;
+            }
             renderizar();
         });
     });
 
     // invertir campo seleccionado
+    /*
     document.getElementById("ordenar_consulta").addEventListener("click", () => {
         ascendente = !ascendente;
         document.querySelectorAll(".orden").forEach((indicador) => indicador.textContent = "");
         const botonActivo = document.querySelector(`[data-sort="${ordenCampo}"]`);
         if (botonActivo) {
-            botonActivo.querySelector(".orden").textContent = ascendente ? " ▲" : " ▼";
+            if (ascendente) {
+                botonActivo.querySelector(".orden").textContent = " ▲";
+            } else {
+                botonActivo.querySelector(".orden").textContent = " ▼";
+            }
             const nombre = botonActivo.textContent.trim().replace(/[▲▼]/, "").trim();
-            detalleOrden.textContent = `Orden: 1) ${nombre} ${ascendente ? "ascendente" : "descendente"}`;
+            if (ascendente) {
+                detalleOrden.textContent = `Orden: 1) ${nombre} ascendente`;
+            } else {
+                detalleOrden.textContent = `Orden: 1) ${nombre} descendente`;
+            }
         }
         renderizar();
     });
+    */
 
     // muestrar u ocultar columnas en base a su indice
     document.querySelectorAll("#menu_columnas input[data-column]").forEach((checkbox) => {
@@ -160,25 +258,24 @@
     });
 
     function descargarCsv(separador, extension, registrosExportacion) {
-        const encabezados = [
-            "ID", "Fecha", "Hora", "Provincia", "Cantón", "Ruta", "Vehículo",
-            "Franja", "Clima", "Calzada", "TPR", "Severidad"
-        ];
-        const campos = [
-            "Id", "Fecha", "Hora", "Provincia", "Canton", "Ruta", "Vehiculo",
-            "Franja", "Clima", "Calzada", "Tpr", "Severidad"
-        ];
+        const encabezados = columnas.map(etiquetaColumna);
+        const campos = columnas.map(campoColumna);
         const filasCsv = registrosExportacion.map((registro) =>
-            campos.map((campo) =>
-                `"${String(registro[campo] ?? "").replaceAll('"', '""')}"`
-            ).join(separador)
+            campos.map((campo) => {
+                let valor = "";
+                if (registro[campo] !== null && registro[campo] !== undefined) {
+                    valor = registro[campo];
+                }
+                return `"${String(valor).replaceAll('"', '""')}"`;
+            }).join(separador)
         );
         const contenidoCsv =
             "\ufeff" + encabezados.join(separador) + "\n"
             + filasCsv.join("\n");
-        const tipo = extension === "xls"
-            ? "application/vnd.ms-excel;charset=utf-8"
-            : "text/csv;charset=utf-8";
+        let tipo = "text/csv;charset=utf-8";
+        if (extension === "xls") {
+            tipo = "application/vnd.ms-excel;charset=utf-8";
+        }
         const blob = new Blob([contenidoCsv], { type: tipo });
         const enlace = document.createElement("a");
         enlace.href = URL.createObjectURL(blob);
@@ -194,7 +291,8 @@
     // coneccion a Mongo
     // solicita al servidor todos los registros para exportarlos
     async function obtenerDatosExportacion() {
-        const respuesta = await fetch("/Explorador/DatosExportacion", {
+        const urlColeccion = encodeURIComponent(coleccion);
+        const respuesta = await fetch(`/Explorador/DatosExportacion?collection=${urlColeccion}`, {
             headers: { "Accept": "application/json" }
         });
         if (!respuesta.ok) throw new Error("No fue posible obtener los datos para exportar.");
@@ -207,12 +305,24 @@
         ).value;
 
         try {
-            const registrosExportacion = await obtenerDatosExportacion();
+            const consultaExportacion = await obtenerDatosExportacion();
+            let registrosExportacion = [];
+            if (consultaExportacion.Filas !== null && consultaExportacion.Filas !== undefined) {
+                registrosExportacion = consultaExportacion.Filas;
+            } else if (consultaExportacion.filas !== null && consultaExportacion.filas !== undefined) {
+                registrosExportacion = consultaExportacion.filas;
+            }
 
             if (formato === "csv") descargarCsv(",", "csv", registrosExportacion);
             if (formato === "excel") descargarCsv(";", "xls", registrosExportacion);
             if (formato === "pdf") {
-                window.exportarConsultaPdf(registrosExportacion);
+                let columnasExportacion = columnas;
+                if (consultaExportacion.Columnas !== null && consultaExportacion.Columnas !== undefined) {
+                    columnasExportacion = consultaExportacion.Columnas;
+                } else if (consultaExportacion.columnas !== null && consultaExportacion.columnas !== undefined) {
+                    columnasExportacion = consultaExportacion.columnas;
+                }
+                window.exportarConsultaPdf(registrosExportacion, columnasExportacion);
             }
 
             document.getElementById("exportacion_con_resultados").hidden = true;

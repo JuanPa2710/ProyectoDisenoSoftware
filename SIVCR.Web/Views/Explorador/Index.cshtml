@@ -1,4 +1,4 @@
-@model IReadOnlyList<SIVCR.Web.Models.RegistroVialViewModel>
+@model SIVCR.Web.Models.ExploradorConsultaViewModel
 
 @{
     ViewData["Title"] = "Explorador de registros";
@@ -21,6 +21,17 @@
              aria-label="Consulta de incidentes">
         <div class="explorador_herramientas">
             <div class="explorador_acciones">
+                <form method="get" action="@Url.Action("Index", "Explorador")">
+                    <label for="coleccion_explorador">Colección</label>
+                    <select id="coleccion_explorador"
+                            name="collection"
+                            onchange="this.form.submit()">
+                        <option value="Incidencias" selected="@(Model.Coleccion == "Incidencias")">Accidentes</option>
+                        <option value="PersonasAccidentes" selected="@(Model.Coleccion == "PersonasAccidentes")">Personas accientadas</option>
+                        <option value="RedVial" selected="@(Model.Coleccion == "RedVial")">Red vial</option>
+                    </select>
+                </form>
+
                 <button id="abrir_exportacion"
                         class="sivcr-button sivcr-button--primary"
                         type="button">
@@ -30,7 +41,8 @@
                     </svg>
                     Exportar
                 </button>
-
+                
+                <!--
                 <button id="ordenar_consulta"
                         class="explorador_accion"
                         type="button">
@@ -40,6 +52,7 @@
                     </svg>
                     Ordenar
                 </button>
+                -->
 
                 <details class="explorador_columnas">
                     <summary class="explorador_accion">
@@ -51,18 +64,6 @@
                     </summary>
                     <div class="explorador_columnas_menu"
                          id="menu_columnas">
-                        <label><input type="checkbox" data-column="0" checked /> ID</label>
-                        <label><input type="checkbox" data-column="1" checked /> Fecha</label>
-                        <label><input type="checkbox" data-column="2" checked /> Hora</label>
-                        <label><input type="checkbox" data-column="3" checked /> Provincia</label>
-                        <label><input type="checkbox" data-column="4" checked /> Cantón</label>
-                        <label><input type="checkbox" data-column="5" checked /> Ruta</label>
-                        <label><input type="checkbox" data-column="6" checked /> Vehículo</label>
-                        <label><input type="checkbox" data-column="7" checked /> Franja</label>
-                        <label><input type="checkbox" data-column="8" checked /> Clima</label>
-                        <label><input type="checkbox" data-column="9" checked /> Calzada</label>
-                        <label><input type="checkbox" data-column="10" checked /> TPR</label>
-                        <label><input type="checkbox" data-column="11" checked /> Severidad</label>
                     </div>
                 </details>
 
@@ -114,68 +115,6 @@
                        aria-label="Incidentes viales">
                     <thead>
                         <tr>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Id">
-                                    ID <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Fecha">
-                                    Fecha <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">Hora</th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Provincia">
-                                    Provincia <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Canton">
-                                    Cantón <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Ruta">
-                                    Ruta <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">Vehículo</th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Franja">
-                                    Franja <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Clima">
-                                    Clima <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Calzada">
-                                    Calzada <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Tpr">
-                                    TPR <span class="orden"></span>
-                                </button>
-                            </th>
-                            <th scope="col">
-                                <button type="button"
-                                        data-sort="Severidad">
-                                    Severidad <span class="orden"></span>
-                                </button>
-                            </th>
                         </tr>
                     </thead>
                     <tbody id="filas_registros"></tbody>

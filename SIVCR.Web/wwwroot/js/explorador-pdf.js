@@ -1,5 +1,5 @@
 (function () {
-    window.exportarConsultaPdf = function (registros) {
+    window.exportarConsultaPdf = function (registros, columnasConsulta) {
         if (!window.jspdf || !window.jspdf.jsPDF) {
             throw new Error("La librería jsPDF no está disponible.");
         }
@@ -10,14 +10,25 @@
             format: "a4"
         });
 
-        const encabezados = [
-            "ID", "Fecha", "Hora", "Provincia", "Canton", "Ruta",
-            "Vehiculo", "Franja", "Clima", "Calzada", "TPR", "Severidad"
-        ];
-        const campos = [
-            "Id", "Fecha", "Hora", "Provincia", "Canton", "Ruta",
-            "Vehiculo", "Franja", "Clima", "Calzada", "Tpr", "Severidad"
-        ];
+        let columnas = [];
+        if (columnasConsulta !== null && columnasConsulta !== undefined) {
+            if (columnasConsulta.length > 0) {
+                columnas = columnasConsulta;
+            }
+        }
+
+        const encabezados = columnas.map((columna) => {
+            if (columna.Etiqueta !== null && columna.Etiqueta !== undefined) {
+                return columna.Etiqueta;
+            }
+            return columna.etiqueta;
+        });
+        const campos = columnas.map((columna) => {
+            if (columna.Campo !== null && columna.Campo !== undefined) {
+                return columna.Campo;
+            }
+            return columna.campo;
+        });
 
         const margenIzquierdo = 8;
         const margenSuperior = 16;
@@ -55,8 +66,12 @@
         documento.setFont("helvetica", "normal");
         documento.setFontSize(9);
         documento.setTextColor(71, 85, 105);
+        let etiquetaRegistros = " registros";
+        if (registros.length === 1) {
+            etiquetaRegistros = " registro";
+        }
         documento.text(
-            `${registros.length} registro${registros.length === 1 ? "" : "s"} encontrados`,
+            `${registros.length}${etiquetaRegistros} encontrados`,
             anchoPagina - margenIzquierdo,
             10,
             { align: "right" }
@@ -80,12 +95,19 @@
             documento.setTextColor(20, 31, 48);
 
             campos.forEach((campo, columna) => {
-                const valor = String(registro[campo] ?? "");
+                let valor = "";
+                if (registro[campo] !== null && registro[campo] !== undefined) {
+                    valor = registro[campo];
+                }
+                const textoValor = String(valor);
                 const x = margenIzquierdo + (columna * anchoColumna);
-                const fondoFila = indice % 2 === 0 ? 248 : 255;
+                let fondoFila = 255;
+                if (indice % 2 === 0) {
+                    fondoFila = 248;
+                }
                 documento.setFillColor(fondoFila, fondoFila, fondoFila);
                 documento.rect(x, y, anchoColumna, altoFila, "FD");
-                documento.text(valor, x + 1.5, y + 5.5, {
+                documento.text(textoValor, x + 1.5, y + 5.5, {
                     maxWidth: anchoColumna - 3
                 });
             });
