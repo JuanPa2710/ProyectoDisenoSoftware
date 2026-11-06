@@ -24,20 +24,11 @@
     
     //estado de columna actual
     let filtrados = [...todos];
-    let ordenCampo = "";
-    if (columnas.length > 0) {
-        if (columnas[0].Campo !== null && columnas[0].Campo !== undefined) {
-            ordenCampo = columnas[0].Campo;
-        } else if (columnas[0].campo !== null && columnas[0].campo !== undefined) {
-            ordenCampo = columnas[0].campo;
-        }
-    }
-    let ascendente = false;
+    let ordenes = [];
     let pagina = 1;
     const porPagina = 10;
 
     const filas = document.getElementById("filas_registros");
-    const totalConsulta = document.getElementById("total_consulta");
     const rango = document.getElementById("rango_registros");
     const anterior = document.getElementById("pagina_anterior");
     const siguiente = document.getElementById("pagina_siguiente");
@@ -47,7 +38,6 @@
     const carga = document.getElementById("estado_carga");
     const contenido = document.getElementById("contenido_tabla");
     const error = document.getElementById("estado_error");
-    const detalleOrden = document.getElementById("detalle_orden");
 
     function campoColumna(columna) {
         if (columna.Campo !== null && columna.Campo !== undefined) {
@@ -77,7 +67,9 @@
 
         menuColumnas.innerHTML = columnas.map((columna, indice) => `
             <label>
-                <input type="checkbox" data-column="${indice}" checked />
+                <input type="checkbox"
+                       data-column="${indice}"
+                       ${columnaOcultaPorDefecto(columna) ? "" : "checked"} />
                 ${escapar(etiquetaColumna(columna))}
             </label>
         `).join("");
@@ -89,6 +81,47 @@
     }
 
     prepararEncabezados();
+
+    function columnaOcultaPorDefecto(columna) {
+        const campo = campoColumna(columna).toLowerCase();
+        const etiqueta = etiquetaColumna(columna).toLowerCase();
+        const campoNormalizado = campo.replace(/[\s._-]+/g, "");
+        const etiquetaNormalizada = etiqueta.replace(/[\s._-]+/g, "");
+
+        if (campoNormalizado === "_id") return true;
+        if (campoNormalizado === "id" || etiquetaNormalizada === "id") return true;
+        if (campo.endsWith("._id") || campo === "_id") return true;
+        if (campoNormalizado.includes("cargaid")) return true;
+        if (etiquetaNormalizada.includes("cargaid")) return true;
+        if (campoNormalizado.endsWith("idobjeto")) return true;
+        if (etiquetaNormalizada.includes("idobjeto")) return true;
+        return false;
+    }
+
+    function obtenerColumnasVisibles() {
+        const columnasVisibles = [];
+        document.querySelectorAll("#menu_columnas input[data-column]").forEach((checkbox) => {
+            if (checkbox.checked) {
+                const indice = Number(checkbox.dataset.column);
+                if (indice >= 0 && indice < columnas.length) {
+                    columnasVisibles.push(columnas[indice]);
+                }
+            }
+        });
+        return columnasVisibles;
+    }
+
+    function aplicarVisibilidadColumnas() {
+        document.querySelectorAll("#menu_columnas input[data-column]").forEach((checkbox) => {
+            const indice = Number(checkbox.dataset.column);
+            document.querySelectorAll(".explorador_tabla tr").forEach((fila) => {
+                const celda = fila.children[indice];
+                if (celda) {
+                    celda.hidden = !checkbox.checked;
+                }
+            });
+        });
+    }
 
     // asignar color según severidad
     function claseSeveridad(valor) {
@@ -110,12 +143,18 @@
 
         // ordena una copia de los registros, sin modificar la fuente original.
         filtrados.sort((a, b) => {
-            const resultado = String(a[ordenCampo]).localeCompare(String(b[ordenCampo]), "es", { numeric: true });
-            if (ascendente) {
-                return resultado;
-            } else {
-                return -resultado;
+            for (const orden of ordenes) {
+                const resultado = String(a[orden.campo] || "")
+                    .localeCompare(String(b[orden.campo] || ""), "es", { numeric: true });
+                if (resultado !== 0) {
+                    if (orden.ascendente) {
+                        return resultado;
+                    } else {
+                        return -resultado;
+                    }
+                }
             }
+            return 0;
         });
 
         const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
@@ -135,12 +174,8 @@
                 }).join("")}
             </tr>
         `).join("");
+        aplicarVisibilidadColumnas();
 
-        let etiquetaRegistros = " registros";
-        if (filtrados.length === 1) {
-            etiquetaRegistros = " registro";
-        }
-        totalConsulta.textContent = `${filtrados.length}${etiquetaRegistros} encontrados`;
         const hayResultados = filtrados.length > 0;
         sinResultados.hidden = hayResultados;
         tablaContenedor.hidden = !hayResultados;
@@ -181,52 +216,43 @@
     }
 
     // para ordenar la tabla
+    function actualizarIndicadoresOrden() {
+        document.querySelectorAll(".orden").forEach((indicador) => {
+            indicador.textContent = "";
+        });
+
+        ordenes.forEach((orden) => {
+            const botonOrden = document.querySelector(`[data-sort="${orden.campo}"]`);
+            if (botonOrden) {
+                const indicador = orden.ascendente ? "▲" : "▼";
+                botonOrden.querySelector(".orden").textContent = ` ${indicador}`;
+            }
+        });
+    }
+
     document.querySelectorAll("[data-sort]").forEach((boton) => {
         boton.addEventListener("click", () => {
             const campo = boton.dataset.sort;
-            if (ordenCampo === campo) ascendente = !ascendente;
-            else {
-                ordenCampo = campo;
-                ascendente = true;
-            }
-            document.querySelectorAll(".orden").forEach((indicador) => indicador.textContent = "");
-            if (ascendente) {
-                boton.querySelector(".orden").textContent = " ▲";
+            const indiceOrden = ordenes.findIndex((orden) => orden.campo === campo);
+
+            if (indiceOrden >= 0) {
+                if (ordenes[indiceOrden].ascendente) {
+                    ordenes[indiceOrden].ascendente = false;
+                } else {
+                    ordenes = ordenes.filter((orden) => orden.campo !== campo);
+                }
             } else {
-                boton.querySelector(".orden").textContent = " ▼";
+                ordenes.push({
+                    campo,
+                    ascendente: true
+                });
             }
-            const nombre = boton.textContent.trim().replace(/[▲▼]/, "").trim();
-            if (ascendente) {
-                detalleOrden.textContent = `Orden: 1) ${nombre} ascendente`;
-            } else {
-                detalleOrden.textContent = `Orden: 1) ${nombre} descendente`;
-            }
+
+            actualizarIndicadoresOrden();
             renderizar();
         });
     });
 
-    // invertir campo seleccionado
-    /*
-    document.getElementById("ordenar_consulta").addEventListener("click", () => {
-        ascendente = !ascendente;
-        document.querySelectorAll(".orden").forEach((indicador) => indicador.textContent = "");
-        const botonActivo = document.querySelector(`[data-sort="${ordenCampo}"]`);
-        if (botonActivo) {
-            if (ascendente) {
-                botonActivo.querySelector(".orden").textContent = " ▲";
-            } else {
-                botonActivo.querySelector(".orden").textContent = " ▼";
-            }
-            const nombre = botonActivo.textContent.trim().replace(/[▲▼]/, "").trim();
-            if (ascendente) {
-                detalleOrden.textContent = `Orden: 1) ${nombre} ascendente`;
-            } else {
-                detalleOrden.textContent = `Orden: 1) ${nombre} descendente`;
-            }
-        }
-        renderizar();
-    });
-    */
 
     // muestrar u ocultar columnas en base a su indice
     document.querySelectorAll("#menu_columnas input[data-column]").forEach((checkbox) => {
@@ -257,9 +283,9 @@
         ).show();
     });
 
-    function descargarCsv(separador, extension, registrosExportacion) {
-        const encabezados = columnas.map(etiquetaColumna);
-        const campos = columnas.map(campoColumna);
+    function descargarCsv(separador, extension, registrosExportacion, columnasExportacion) {
+        const encabezados = columnasExportacion.map(etiquetaColumna);
+        const campos = columnasExportacion.map(campoColumna);
         const filasCsv = registrosExportacion.map((registro) =>
             campos.map((campo) => {
                 let valor = "";
@@ -287,12 +313,58 @@
         window.setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
     }
 
+    async function descargarXlsx(columnasExportacion) {
+        const parametros = new URLSearchParams(window.location.search);
+        parametros.set("collection", coleccion);
+
+        const respuesta = await fetch(
+            `/Explorador/ExportarXlsx?${parametros.toString()}`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                },
+                body: JSON.stringify(columnasExportacion.map((columna) => ({
+                    Campo: campoColumna(columna),
+                    Etiqueta: etiquetaColumna(columna)
+                })))
+            }
+        );
+
+        if (!respuesta.ok) {
+            let detalle = "No fue posible generar el archivo Excel.";
+            try {
+                const respuestaError = await respuesta.text();
+                if (respuestaError !== null
+                    && respuestaError.trim() !== "") {
+                    detalle = respuestaError;
+                }
+            } catch {
+                detalle = "No fue posible generar el archivo Excel.";
+            }
+            throw new Error(detalle);
+        }
+
+        const archivo = await respuesta.blob();
+        const url = URL.createObjectURL(archivo);
+        const enlace = document.createElement("a");
+        enlace.href = url;
+        enlace.download = "consulta-incidentes.xlsx";
+        enlace.style.display = "none";
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
 
     // coneccion a Mongo
     // solicita al servidor todos los registros para exportarlos
     async function obtenerDatosExportacion() {
-        const urlColeccion = encodeURIComponent(coleccion);
-        const respuesta = await fetch(`/Explorador/DatosExportacion?collection=${urlColeccion}`, {
+        const parametros = new URLSearchParams(window.location.search);
+        parametros.set("collection", coleccion);
+        const respuesta = await fetch(`/Explorador/DatosExportacion?${parametros.toString()}`, {
             headers: { "Accept": "application/json" }
         });
         if (!respuesta.ok) throw new Error("No fue posible obtener los datos para exportar.");
@@ -303,6 +375,12 @@
         const formato = document.querySelector(
             'input[name="formato_exportacion"]:checked'
         ).value;
+        const columnasVisibles = obtenerColumnasVisibles();
+
+        document.getElementById("exportacion_sin_resultados").hidden = true;
+        document.getElementById("exportacion_con_resultados").hidden = true;
+        document.getElementById("confirmar_exportacion").hidden = true;
+        document.getElementById("exportacion_completada").hidden = false;
 
         try {
             const consultaExportacion = await obtenerDatosExportacion();
@@ -313,22 +391,25 @@
                 registrosExportacion = consultaExportacion.filas;
             }
 
-            if (formato === "csv") descargarCsv(",", "csv", registrosExportacion);
-            if (formato === "excel") descargarCsv(";", "xls", registrosExportacion);
+            if (formato === "csv") descargarCsv(",", "csv", registrosExportacion, columnasVisibles);
+            if (formato === "excel") await descargarXlsx(columnasVisibles);
             if (formato === "pdf") {
-                let columnasExportacion = columnas;
+                let columnasExportacion = columnasVisibles;
                 if (consultaExportacion.Columnas !== null && consultaExportacion.Columnas !== undefined) {
                     columnasExportacion = consultaExportacion.Columnas;
                 } else if (consultaExportacion.columnas !== null && consultaExportacion.columnas !== undefined) {
                     columnasExportacion = consultaExportacion.columnas;
                 }
+                const camposVisibles = new Set(columnasVisibles.map(campoColumna));
+                columnasExportacion = columnasExportacion.filter((columna) =>
+                    camposVisibles.has(campoColumna(columna))
+                );
                 window.exportarConsultaPdf(registrosExportacion, columnasExportacion);
             }
-
-            document.getElementById("exportacion_con_resultados").hidden = true;
-            document.getElementById("confirmar_exportacion").hidden = true;
-            document.getElementById("exportacion_completada").hidden = false;
         } catch (errorExportacion) {
+            document.getElementById("exportacion_con_resultados").hidden = false;
+            document.getElementById("confirmar_exportacion").hidden = false;
+            document.getElementById("exportacion_completada").hidden = true;
             alert(errorExportacion.message);
         }
     });
@@ -344,5 +425,6 @@
         }, 350);
     }
 
+    actualizarIndicadoresOrden();
     iniciarCarga();
 })();

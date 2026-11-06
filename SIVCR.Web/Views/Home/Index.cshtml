@@ -34,7 +34,23 @@
     <div><p class="dashboard__breadcrumb">Inicio / Dashboard</p><h1 id="dashboard-title">Dashboard de siniestralidad vial</h1></div>
     <div class="dashboard__actions">
       <button id="btn-guardar-filtros" class="sivcr-button sivcr-button--secondary" type="button">Guardar filtros</button>
-      <a asp-controller="Explorador" asp-action="Index" class="sivcr-button sivcr-button--primary">Ver registros y exportar</a>
+      <a asp-controller="Explorador"
+         asp-action="Index"
+         asp-route-Filtros.Provincia="@Model.Filtros.Provincia"
+         asp-route-Filtros.Canton="@Model.Filtros.Canton"
+         asp-route-Filtros.Distrito="@Model.Filtros.Distrito"
+         asp-route-Filtros.Ruta="@Model.Filtros.Ruta"
+         asp-route-Filtros.Anio="@Model.Filtros.Anio"
+         asp-route-Filtros.Mes="@Model.Filtros.Mes"
+         asp-route-Filtros.DiaSemana="@Model.Filtros.DiaSemana"
+         asp-route-Filtros.FranjaHoraria="@Model.Filtros.FranjaHoraria"
+         asp-route-Filtros.TipoAccidente="@Model.Filtros.TipoAccidente"
+         asp-route-Filtros.Clima="@Model.Filtros.Clima"
+         asp-route-Filtros.EstadoCalzada="@Model.Filtros.EstadoCalzada"
+         asp-route-Filtros.Severidad="@Model.Filtros.Severidad"
+         class="sivcr-button sivcr-button--primary">
+        Ver registros y exportar
+      </a>
     </div>
   </header>
 

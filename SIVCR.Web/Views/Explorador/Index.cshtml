@@ -22,6 +22,15 @@
         <div class="explorador_herramientas">
             <div class="explorador_acciones">
                 <form method="get" action="@Url.Action("Index", "Explorador")">
+                    @foreach (var nombreFiltro in Context.Request.Query.Keys)
+                    {
+                        if (nombreFiltro != null && nombreFiltro.StartsWith("Filtros.", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <input type="hidden"
+                                   name="@nombreFiltro"
+                                   value="@Context.Request.Query[nombreFiltro]" />
+                        }
+                    }
                     <label for="coleccion_explorador">Colección</label>
                     <select id="coleccion_explorador"
                             name="collection"
@@ -78,15 +87,6 @@
                 </a>
             </div>
 
-        </div>
-
-        <div class="explorador_resumen">
-            <span id="total_consulta"
-                  class="explorador_total"></span>
-            <span id="detalle_orden"
-                  class="explorador_detalle_orden">
-                Orden: 1) Fecha descendente · 2) Severidad descendente
-            </span>
         </div>
 
         <div id="estado_carga"

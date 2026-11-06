@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using SIVCR.Web.Models;
 using System.Diagnostics;
 using System.Globalization;
+using SIVCR.Web.Services;
 
 namespace SIVCR.Web.Controllers;
 
@@ -32,7 +33,7 @@ public sealed class HomeController : Controller
                 throw new InvalidOperationException("MongoDB no está configurado.");
 
             var coleccion = ObtenerColeccion();
-            var filtro = CrearFiltro(filtros);
+            var filtro = MongoFilterBuilder.CrearFiltro(filtros);
 
             // Todas las consultas se ejecutan en MongoDB. La Web recibe
             // únicamente conteos y agrupaciones, no los documentos completos.
@@ -609,7 +610,7 @@ public sealed class HomeController : Controller
             NoDisponible("Índice de severidad", "Faltan los pesos W1, W2 y W3 definidos por el SAD."),
             NoDisponible("Tiempo promedio de respuesta", "La fuente no incluye tiempos de atención o llegada."),
             NoDisponible("Víctimas", "La fuente no incluye víctimas, género ni rango de edad."),
-            NoDisponible("Fatalidad · motocicleta", "La fuente no incluye el tipo de vehículo involucrado.")
+            NoDisponible("Fatalidad - motocicleta", "La fuente no incluye el tipo de vehículo involucrado.")
         ];
 
         modelo.Provincias = provincias;

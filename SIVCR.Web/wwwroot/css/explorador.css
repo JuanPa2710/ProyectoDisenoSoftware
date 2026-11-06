@@ -152,24 +152,6 @@
     font-size: 13px;
 }
 
-.explorador_resumen {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 52px;
-    padding: 0 16px;
-}
-
-.explorador_total {
-    color: var(--sivcr-text-muted);
-    font-size: 12px;
-}
-
-.explorador_detalle_orden {
-    color: var(--sivcr-text-muted);
-    font-size: 11px;
-    text-align: right;
-}
 
 .explorador_tabla_contenedor {
     overflow: auto;
@@ -220,7 +202,7 @@
 }
 
 .orden {
-    color: var(--sivcr-accent);
+    color: var(--sivcr-text-soft);
 }
 
 .explorador_severidad {

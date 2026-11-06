@@ -4,11 +4,12 @@ using MongoDB.Driver;
 using SIVCR.Web.Models;
 using System.Text.Json;
 using System.Globalization;
+using SIVCR.Web.Services;
+using ClosedXML.Excel;
 
 namespace SIVCR.Web.Controllers;
 
-public sealed class ExploradorController : Controller
-{
+public sealed class ExploradorController : Controller {
 
     private readonly IConfiguration configuracion; 
     private readonly IWebHostEnvironment entorno;
@@ -25,8 +26,11 @@ public sealed class ExploradorController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? collection = null)
-    {
+    public async Task<IActionResult> Index(string? collection = null, [FromQuery] DashboardFiltrosViewModel? filtros = null) {
+        if (filtros is null)
+        {
+            filtros = new DashboardFiltrosViewModel();
+        }
         var cargarDatos = configuracion.GetValue<bool>(
             "Explorador:CargarDatos"
         );
@@ -47,12 +51,9 @@ public sealed class ExploradorController : Controller
                     nombreColeccion
                 );
 
+                var filtroMongo = MongoFilterBuilder.CrearFiltro(filtros);
                 var documentos = await coleccion
-                    .Find(FilterDefinition<BsonDocument>.Empty)
-                    .Limit(configuracion.GetValue<int>(
-                        "MongoDB:ExploradorCargaInicial",
-                        1000
-                    ))
+                    .Find(filtroMongo)
                     .ToListAsync();
 
                 return View(CrearConsultaDinamica(
@@ -60,16 +61,14 @@ public sealed class ExploradorController : Controller
                     documentos
                 ));
             } catch (MongoException) {
-                ViewData["ErrorMongoDB"] =
-                    "No fue posible conectar o consultar MongoDB.";
+                ViewData["ErrorMongoDB"] = "No fue posible conectar o consultar MongoDB.";
                 return View(new ExploradorConsultaViewModel());
             }
         }
-        return await CargarDatosPruebaAsync();
+        return await CargarDatosPruebaAsync(filtros);
     }
 
-    private async Task<IActionResult> CargarDatosPruebaAsync()
-    {
+    private async Task<IActionResult> CargarDatosPruebaAsync(DashboardFiltrosViewModel? filtros = null){
         var rutaArchivo = configuracion["Explorador:DatosPruebaArchivo"];
 
         if (string.IsNullOrWhiteSpace(rutaArchivo)) {
@@ -98,7 +97,13 @@ public sealed class ExploradorController : Controller
             registrosDisponibles = [];
         }
 
+        if (filtros is null)
+        {
+            filtros = new DashboardFiltrosViewModel();
+        }
+
         var filas = registrosDisponibles
+            .Where(registro => CoincideConFiltros(registro, filtros))
             .Select(registro => new Dictionary<string, string?> {
                 ["Id"] = registro.Id,
                 ["Fecha"] = registro.Fecha,
@@ -118,9 +123,48 @@ public sealed class ExploradorController : Controller
         return View(CrearConsultaDinamica("Incidencias", filas));
     }
 
-    [HttpGet]
-    public async Task<IActionResult> DatosExportacion(string? collection = null)
+    private static bool CoincideConFiltros( RegistroVialViewModel registro, DashboardFiltrosViewModel filtros) {
+        if (!CoincideTexto(registro.Provincia, filtros.Provincia)) return false;
+        if (!CoincideTexto(registro.Canton, filtros.Canton)) return false;
+        if (!CoincideTexto(registro.Ruta, filtros.Ruta)) return false;
+        if (!CoincideTexto(registro.Franja, filtros.FranjaHoraria)) return false;
+        if (!CoincideTexto(registro.Vehiculo, filtros.TipoAccidente)) return false;
+        if (!CoincideTexto(registro.Clima, filtros.Clima)) return false;
+        if (!CoincideTexto(registro.Calzada, filtros.EstadoCalzada)) return false;
+        if (!CoincideTexto(registro.Severidad, filtros.Severidad)) return false;
+
+        if (filtros.Anio.HasValue || filtros.Mes.HasValue || filtros.DiaSemana.HasValue)
+        {
+            if (!DateTime.TryParseExact(
+                registro.Fecha,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var fecha))
+            {
+                return false;
+            }
+            if (filtros.Anio.HasValue && fecha.Year != filtros.Anio.Value) return false;
+            if (filtros.Mes.HasValue && fecha.Month != filtros.Mes.Value) return false;
+        }
+
+        return true;
+    }
+
+    private static bool CoincideTexto(string? valor, string? filtro)
     {
+        if (string.IsNullOrWhiteSpace(filtro))
+        {
+            return true;
+        }
+        return string.Equals(valor, filtro, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DatosExportacion(string? collection = null, [FromQuery] DashboardFiltrosViewModel? filtros = null){
+        if (filtros is null) {
+            filtros = new DashboardFiltrosViewModel();
+        }
         var cargarDatos = configuracion.GetValue<bool>(
             "Explorador:CargarDatos"
         );
@@ -128,7 +172,7 @@ public sealed class ExploradorController : Controller
         // coneccion a Mongo
         // exporta los registros
         if (!cargarDatos) {
-            var resultado = await CargarDatosPruebaAsync();
+            var resultado = await CargarDatosPruebaAsync(filtros);
             if (resultado is ViewResult vista) {
                 return Json(vista.Model);
             }
@@ -145,13 +189,100 @@ public sealed class ExploradorController : Controller
         );
 
         var documentos = await coleccion
-            .Find(FilterDefinition<BsonDocument>.Empty)
+            .Find(MongoFilterBuilder.CrearFiltro(filtros))
             .ToListAsync();
 
         return Json(CrearConsultaDinamica(
             ObtenerColeccionPermitida(collection),
             documentos
         ));
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ExportarXlsx(
+        string? collection = null,
+        [FromQuery] DashboardFiltrosViewModel? filtros = null,
+        [FromBody] List<ExploradorColumnaViewModel>? columnas = null
+    ) {
+        if (filtros is null) {
+            filtros = new DashboardFiltrosViewModel();
+        }
+        if (columnas is null) {
+            columnas = [];
+        }
+
+        ExploradorConsultaViewModel consulta;
+        var cargarDatos = configuracion.GetValue<bool>(
+            "Explorador:CargarDatos"
+        );
+
+        if (!cargarDatos) {
+            var resultado = await CargarDatosPruebaAsync(filtros);
+            if (resultado is ViewResult vista) {
+                consulta = vista.Model as ExploradorConsultaViewModel
+                    ?? new ExploradorConsultaViewModel();
+            } else {
+                consulta = new ExploradorConsultaViewModel();
+            }
+        } else {
+            if (mongoClient is null) {
+                return BadRequest("MongoDB no está configurado.");
+            }
+                try {
+                    var database = mongoClient.GetDatabase(
+                        configuracion["MongoDB:Database"]
+                    );
+                    var nombreColeccion = ObtenerColeccionPermitida(collection);
+                    var coleccion = database.GetCollection<BsonDocument>(
+                        nombreColeccion
+                    );
+                    var documentos = await coleccion
+                        .Find(MongoFilterBuilder.CrearFiltro(filtros))
+                        .ToListAsync();
+                    consulta = CrearConsultaDinamica(nombreColeccion, documentos);
+                } catch (MongoException) {
+                    return StatusCode(
+                        503,
+                        "No fue posible consultar MongoDB para generar el archivo Excel."
+                    );
+                }
+        }
+
+        using var libro = new XLWorkbook();
+        var hoja = libro.Worksheets.Add("Consulta");
+
+        for (var indice = 0; indice < columnas.Count; indice++) {
+            hoja.Cell(1, indice + 1).Value = columnas[indice].Etiqueta;
+        }
+
+        var encabezado = hoja.Row(1);
+        encabezado.Style.Font.Bold = true;
+        encabezado.Style.Fill.BackgroundColor = XLColor.FromHtml("#2563EB");
+        encabezado.Style.Font.FontColor = XLColor.White;
+
+        for (var filaIndice = 0; filaIndice < consulta.Filas.Count; filaIndice++) {
+            var fila = consulta.Filas[filaIndice];
+            for (var columnaIndice = 0; columnaIndice < columnas.Count; columnaIndice++) {
+                var campo = columnas[columnaIndice].Campo;
+                if (fila.TryGetValue(campo, out var valor) && valor is not null) {
+                    hoja.Cell(filaIndice + 2, columnaIndice + 1).Value = valor;
+                }
+            }
+        }
+
+        if (columnas.Count > 0) {
+            hoja.Range(1, 1, Math.Max(1, consulta.Filas.Count + 1), columnas.Count)
+                .SetAutoFilter();
+        }
+        hoja.Columns().AdjustToContents();
+
+        using var salida = new MemoryStream();
+        libro.SaveAs(salida);
+        return File(
+            salida.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "consulta-incidentes.xlsx"
+        );
     }
 
     private static RegistroVialViewModel MapearRegistro(BsonDocument documento) {
@@ -318,7 +449,7 @@ public sealed class ExploradorController : Controller
             }
         }
 
-        return string.Join(" · ", partes);
+        return string.Join(" - ", partes);
     }
 
 }
