@@ -6,6 +6,7 @@ using SIVCR.Web.Services;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace SIVCR.Web.Controllers;
 
@@ -26,6 +27,7 @@ public sealed class HomeController : Controller
     public async Task<IActionResult> Index(
         [FromQuery] DashboardFiltrosViewModel filtros)
     {
+        filtros = LimpiarFiltros(filtros);
         var modelo = new DashboardViewModel { Filtros = filtros };
 
         // "Variable global": los filtros seleccionados quedan en la sesión
@@ -41,29 +43,50 @@ public sealed class HomeController : Controller
                 throw new InvalidOperationException("MongoDB no está configurado.");
 
             var coleccion = ObtenerColeccion();
+            var personas = ObtenerColeccionPersonas();
             var filtro = CrearFiltro(filtros);
+            var filtroPersonas = CrearFiltroPersonas(filtros);
+            var filtroVictimas = CrearFiltroVictimas(filtros);
 
             // Todas las consultas se ejecutan en MongoDB. La Web recibe
             // únicamente conteos y agrupaciones, no los documentos completos.
             var opciones = ObtenerOpcionesAsync(coleccion, filtros);
+            var opcionesPersonas = ObtenerOpcionesPersonasAsync(personas, filtros);
             var total = coleccion.CountDocumentsAsync(filtro);
+            var totalNacional = coleccion.CountDocumentsAsync(
+                CrearFiltroTasaNacional(filtros));
+            var totalPersonas = personas.CountDocumentsAsync(filtroPersonas);
+            var totalVictimas = personas.CountDocumentsAsync(filtroVictimas);
             var provincias = AgruparAsync(coleccion, filtro, "ubicacion.provincia", 7);
-            var tipos = AgruparAsync(coleccion, filtro, "tipo_accidente", 5);
+            var vehiculos = AgruparAsync(personas, filtroPersonas, "vehiculo", 5);
+            var demografia = ObtenerDemografiaAsync(personas, filtroVictimas);
             var severidades = AgruparAsync(coleccion, filtro, "clase_accidente", 4);
             var rutas = AgruparAsync(coleccion, filtro, "ubicacion.ruta", 7);
             var matriz = ObtenerMatrizTemporalAsync(coleccion, filtro);
 
-            await Task.WhenAll(opciones, total, provincias, tipos, severidades, rutas, matriz);
+            await Task.WhenAll(
+                opciones, opcionesPersonas, total, totalNacional, totalPersonas,
+                totalVictimas, provincias, vehiculos, demografia, severidades,
+                rutas, matriz);
 
             modelo.Opciones = await opciones;
+            var opcionesDePersonas = await opcionesPersonas;
+            modelo.Opciones.Vehiculos = opcionesDePersonas.Vehiculos;
+            modelo.Opciones.Generos = opcionesDePersonas.Generos;
+            modelo.Opciones.RangosEdad = opcionesDePersonas.RangosEdad;
             ConstruirIndicadores(
                 modelo,
                 (int)await total,
+                (int)await totalNacional,
+                (int)await totalPersonas,
+                (int)await totalVictimas,
                 await provincias,
-                await tipos,
+                await vehiculos,
+                await demografia,
                 await severidades,
                 await rutas,
-                await matriz);
+                await matriz,
+                filtros);
         }
         catch (MongoException)
         {
@@ -263,8 +286,9 @@ public sealed class HomeController : Controller
         ("condicion_climatica", "Clima", "Clima"),
         ("estado_calzada", "Calzada", "EstadoCalzada"),
         ("severidad", "Severidad", "Severidad"),
-        ("genero", "Género", null),
-        ("rango_edad", "Rango de edad", null)
+        ("tipo_vehiculo", "Vehículo", "Vehiculo"),
+        ("genero", "Género", "Genero"),
+        ("rango_edad", "Rango de edad", "RangoEdad")
     ];
 
     private const string ClaveFiltrosSesion = "FiltrosDashboard";
@@ -488,6 +512,9 @@ public sealed class HomeController : Controller
         modelo.Clima = Texto("condicion_climatica");
         modelo.EstadoCalzada = Texto("estado_calzada");
         modelo.Severidad = Texto("severidad");
+        modelo.Vehiculo = Texto("tipo_vehiculo");
+        modelo.Genero = Texto("genero");
+        modelo.RangoEdad = Texto("rango_edad");
         return modelo;
     }
 
@@ -509,6 +536,11 @@ public sealed class HomeController : Controller
     private IMongoCollection<BsonDocument> ObtenerColeccion() =>
         mongoClient!.GetDatabase(configuracion["MongoDB:Database"])
             .GetCollection<BsonDocument>(configuracion["MongoDB:Collection"]);
+
+    private IMongoCollection<BsonDocument> ObtenerColeccionPersonas() =>
+        mongoClient!.GetDatabase(configuracion["MongoDB:Database"])
+            .GetCollection<BsonDocument>(
+                configuracion["MongoDB:CollectionPersonas"] ?? "PersonasAccidentes");
 
     private static FilterDefinition<BsonDocument> CrearFiltro(
         DashboardFiltrosViewModel filtros)
@@ -533,6 +565,56 @@ public sealed class HomeController : Controller
             ? constructor.Empty
             : constructor.And(condiciones);
     }
+
+    private static FilterDefinition<BsonDocument> CrearFiltroPersonas(
+        DashboardFiltrosViewModel filtros)
+    {
+        var constructor = Builders<BsonDocument>.Filter;
+        var condiciones = new List<FilterDefinition<BsonDocument>>
+        {
+            constructor.Eq("perfil", "personas_cosevi")
+        };
+
+        AgregarTexto(condiciones, constructor, "ubicacion.provincia", filtros.Provincia);
+        AgregarTexto(condiciones, constructor, "ubicacion.canton", filtros.Canton);
+        AgregarTexto(condiciones, constructor, "ubicacion.distrito", filtros.Distrito);
+        AgregarNumero(condiciones, constructor, "tiempo.anio", filtros.Anio);
+        AgregarNumero(condiciones, constructor, "tiempo.mes", filtros.Mes);
+        AgregarNumero(condiciones, constructor, "tiempo.dia_semana", filtros.DiaSemana);
+        AgregarTexto(condiciones, constructor, "vehiculo", filtros.Vehiculo);
+        AgregarTexto(condiciones, constructor, "sexo", filtros.Genero);
+        AgregarTexto(condiciones, constructor, "edad_quinquenal", filtros.RangoEdad);
+
+        return constructor.And(condiciones);
+    }
+
+    private static FilterDefinition<BsonDocument> CrearFiltroVictimas(
+        DashboardFiltrosViewModel filtros)
+    {
+        var constructor = Builders<BsonDocument>.Filter;
+        return constructor.And(
+            CrearFiltroPersonas(filtros),
+            constructor.In("tipo_lesion", TiposLesionVictima));
+    }
+
+    // La TSV compara la selección geográfica contra el total nacional bajo
+    // las mismas condiciones temporales y del accidente.
+    private static FilterDefinition<BsonDocument> CrearFiltroTasaNacional(
+        DashboardFiltrosViewModel filtros) =>
+        CrearFiltro(new DashboardFiltrosViewModel
+        {
+            Anio = filtros.Anio,
+            Mes = filtros.Mes,
+            DiaSemana = filtros.DiaSemana,
+            FranjaHoraria = filtros.FranjaHoraria,
+            TipoAccidente = filtros.TipoAccidente,
+            Clima = filtros.Clima,
+            EstadoCalzada = filtros.EstadoCalzada,
+            Severidad = filtros.Severidad
+        });
+
+    private static readonly string[] TiposLesionVictima =
+        ["Muerte en sitio", "Herido grave", "Herido leve"];
 
     private static void AgregarTexto(
         List<FilterDefinition<BsonDocument>> condiciones,
@@ -591,6 +673,31 @@ public sealed class HomeController : Controller
         };
     }
 
+    private static async Task<DashboardOpcionesFiltros> ObtenerOpcionesPersonasAsync(
+        IMongoCollection<BsonDocument> coleccion,
+        DashboardFiltrosViewModel filtros)
+    {
+        var vehiculos = ObtenerTextosAsync(
+            coleccion, "vehiculo", FiltroOpcionesPersonas(filtros, "Vehiculo"));
+        var generos = ObtenerTextosAsync(
+            coleccion, "sexo", FiltroOpcionesPersonas(filtros, "Genero"));
+        var rangos = ObtenerTextosAsync(
+            coleccion, "edad_quinquenal", FiltroOpcionesPersonas(filtros, "RangoEdad"));
+
+        await Task.WhenAll(vehiculos, generos, rangos);
+
+        return new DashboardOpcionesFiltros
+        {
+            Vehiculos = await vehiculos,
+            Generos = await generos,
+            RangosEdad = (await rangos)
+                .OrderBy(OrdenRangoEdad)
+                .ThenBy(valor => valor, StringComparer.Create(
+                    new CultureInfo("es-CR"), true))
+                .ToList()
+        };
+    }
+
     private static FilterDefinition<BsonDocument> FiltroOpciones(
         DashboardFiltrosViewModel filtros, string excluida)
     {
@@ -601,6 +708,18 @@ public sealed class HomeController : Controller
         if (excluida == "Provincia") { copia.Canton = null; copia.Distrito = null; }
         if (excluida == "Canton") copia.Distrito = null;
         return CrearFiltro(copia);
+    }
+
+    private static FilterDefinition<BsonDocument> FiltroOpcionesPersonas(
+        DashboardFiltrosViewModel filtros, string excluida)
+    {
+        var copia = new DashboardFiltrosViewModel();
+        foreach (var propiedad in typeof(DashboardFiltrosViewModel).GetProperties())
+            if (propiedad.Name != excluida)
+                propiedad.SetValue(copia, propiedad.GetValue(filtros));
+        if (excluida == "Provincia") { copia.Canton = null; copia.Distrito = null; }
+        if (excluida == "Canton") copia.Distrito = null;
+        return CrearFiltroPersonas(copia);
     }
 
     private static async Task<IReadOnlyList<string>> ObtenerTextosAsync(
@@ -668,6 +787,66 @@ public sealed class HomeController : Controller
             .ToList();
     }
 
+    private static async Task<IReadOnlyList<DashboardDemografiaViewModel>>
+        ObtenerDemografiaAsync(
+            IMongoCollection<BsonDocument> coleccion,
+            FilterDefinition<BsonDocument> filtro)
+    {
+        var constructor = Builders<BsonDocument>.Filter;
+        var grupo = new BsonDocument
+        {
+            {
+                "_id",
+                new BsonDocument
+                {
+                    { "rango", "$edad_quinquenal" },
+                    { "sexo", "$sexo" }
+                }
+            },
+            { "cantidad", new BsonDocument("$sum", 1) }
+        };
+
+        var resultados = await coleccion.Aggregate()
+            .Match(constructor.And(
+                filtro,
+                constructor.Ne("edad_quinquenal", BsonNull.Value),
+                constructor.Ne("edad_quinquenal", "")))
+            .Group(grupo)
+            .ToListAsync();
+
+        var filas = new Dictionary<string, DashboardDemografiaViewModel>(
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var resultado in resultados)
+        {
+            var id = resultado["_id"].AsBsonDocument;
+            var rango = id.GetValue("rango", "Desconocida").AsString;
+            var sexo = id.GetValue("sexo", "Desconocido").IsString
+                ? id["sexo"].AsString
+                : "Desconocido";
+            var cantidad = resultado["cantidad"].ToInt32();
+
+            if (!filas.TryGetValue(rango, out var fila))
+            {
+                fila = new DashboardDemografiaViewModel { RangoEdad = rango };
+                filas.Add(rango, fila);
+            }
+
+            if (sexo.Equals("Hombre", StringComparison.OrdinalIgnoreCase))
+                fila.Hombres += cantidad;
+            else if (sexo.Equals("Mujer", StringComparison.OrdinalIgnoreCase))
+                fila.Mujeres += cantidad;
+            else
+                fila.SexoNoInformado += cantidad;
+        }
+
+        return filas.Values
+            .OrderBy(fila => OrdenRangoEdad(fila.RangoEdad))
+            .ThenBy(fila => fila.RangoEdad, StringComparer.Create(
+                new CultureInfo("es-CR"), true))
+            .ToList();
+    }
+
     private static async Task<IReadOnlyList<DatoTemporal>> ObtenerMatrizTemporalAsync(
         IMongoCollection<BsonDocument> coleccion,
         FilterDefinition<BsonDocument> filtro)
@@ -711,18 +890,33 @@ public sealed class HomeController : Controller
     private static void ConstruirIndicadores(
         DashboardViewModel modelo,
         int total,
+        int totalNacional,
+        int totalPersonas,
+        int totalVictimas,
         IReadOnlyList<DashboardDatoViewModel> provincias,
-        IReadOnlyList<DashboardDatoViewModel> tipos,
+        IReadOnlyList<DashboardDatoViewModel> vehiculos,
+        IReadOnlyList<DashboardDemografiaViewModel> demografia,
         IReadOnlyList<DashboardDatoViewModel> severidades,
         IReadOnlyList<DashboardDatoViewModel> rutas,
-        IReadOnlyList<DatoTemporal> datosTemporales)
+        IReadOnlyList<DatoTemporal> datosTemporales,
+        DashboardFiltrosViewModel filtros)
     {
         modelo.TotalIncidentes = total;
+        modelo.TotalPersonas = totalPersonas;
+        modelo.TotalVictimas = totalVictimas;
         AsignarPorcentajes(provincias, total);
-        AsignarPorcentajes(tipos, total);
+        AsignarPorcentajes(vehiculos, totalPersonas);
         AsignarPorcentajes(severidades, total);
 
-        var provinciaMayor = provincias.FirstOrDefault();
+        var tasa = totalNacional == 0
+            ? (decimal?)null
+            : Math.Round(total * 100m / totalNacional, 1);
+        var ambitoTasa = filtros.Ruta is not null ? $"Ruta {filtros.Ruta}"
+            : filtros.Distrito is not null ? filtros.Distrito
+            : filtros.Canton is not null ? filtros.Canton
+            : filtros.Provincia is not null ? filtros.Provincia
+            : "Total nacional";
+
         modelo.Indicadores =
         [
             new DashboardKpiViewModel
@@ -735,23 +929,45 @@ public sealed class HomeController : Controller
             new DashboardKpiViewModel
             {
                 Titulo = "Tasa de siniestralidad",
-                Valor = provinciaMayor is null ? "—" : Porcentaje(provinciaMayor.Porcentaje),
-                Detalle = provinciaMayor is null
-                    ? "No hay incidentes para los filtros seleccionados"
-                    : $"{provinciaMayor.Etiqueta}, provincia con mayor proporción",
-                Formula = "N provincia / N incidentes filtrados × 100"
+                Valor = tasa.HasValue ? Porcentaje(tasa.Value) : "—",
+                Detalle = totalNacional == 0
+                    ? "No hay incidentes nacionales para estas condiciones"
+                    : $"{ambitoTasa} respecto al total nacional comparable",
+                Formula = "N del ámbito geográfico / N nacional con iguales condiciones × 100"
             },
             NoDisponible("Índice de severidad", "Faltan los pesos W1, W2 y W3 definidos por el SAD."),
             NoDisponible("Tiempo promedio de respuesta", "La fuente no incluye tiempos de atención o llegada."),
-            NoDisponible("Víctimas", "La fuente no incluye víctimas, género ni rango de edad."),
-            NoDisponible("Fatalidad · motocicleta", "La fuente no incluye el tipo de vehículo involucrado.")
+            new DashboardKpiViewModel
+            {
+                Titulo = "Víctimas",
+                Valor = Formatear(totalVictimas),
+                Detalle = "Personas heridas o fallecidas en sitio",
+                Formula = "Muerte en sitio + heridos graves + heridos leves"
+            },
+            NoDisponible(
+                "Fatalidad por vehículo",
+                "No existe una llave persona–accidente para identificar accidentes con fallecidos por vehículo.")
         ];
 
         modelo.Provincias = provincias;
-        modelo.TiposAccidente = tipos;
+        modelo.Vehiculos = vehiculos;
+        modelo.Demografia = demografia;
         modelo.Severidades = severidades;
-        modelo.TipoAccidenteDonutCss = CrearGraficoCircular(modelo.TiposAccidente);
+        modelo.VehiculoDonutCss = CrearGraficoCircular(modelo.Vehiculos);
         modelo.SeveridadPieCss = CrearGraficoCircular(modelo.Severidades);
+
+        var avisos = new List<string>();
+        if (TieneFiltrosSoloDeAccidentes(filtros))
+        {
+            avisos.Add(
+                "Ruta, franja, tipo de accidente, clima, calzada y severidad no pueden aplicarse a personas porque la fuente demográfica no contiene esos campos.");
+        }
+        if (TieneFiltrosSoloDePersonas(filtros))
+        {
+            avisos.Add(
+                "Vehículo, género y rango de edad no pueden aplicarse a incidentes porque las fuentes no incluyen una llave persona–accidente.");
+        }
+        modelo.AvisosAlcance = avisos;
 
         var acumulado = 0;
         modelo.Rutas = rutas.Select(dato =>
@@ -787,6 +1003,21 @@ public sealed class HomeController : Controller
 
         modelo.FranjasMatriz = franjas;
     }
+
+    private static bool TieneFiltrosSoloDeAccidentes(
+        DashboardFiltrosViewModel filtros) =>
+        filtros.Ruta is not null
+        || filtros.FranjaHoraria is not null
+        || filtros.TipoAccidente is not null
+        || filtros.Clima is not null
+        || filtros.EstadoCalzada is not null
+        || filtros.Severidad is not null;
+
+    private static bool TieneFiltrosSoloDePersonas(
+        DashboardFiltrosViewModel filtros) =>
+        filtros.Vehiculo is not null
+        || filtros.Genero is not null
+        || filtros.RangoEdad is not null;
 
     private static void AsignarPorcentajes(
         IReadOnlyList<DashboardDatoViewModel> datos,
@@ -831,10 +1062,16 @@ public sealed class HomeController : Controller
 
         for (var indice = 0; indice < datos.Count; indice++)
         {
-            var final = inicio + datos[indice].Porcentaje;
+            var final = Math.Min(100m, inicio + datos[indice].Porcentaje);
             segmentos.Add(
                 $"{colores[indice % colores.Length]} {inicio.ToString(CultureInfo.InvariantCulture)}% {final.ToString(CultureInfo.InvariantCulture)}%");
             inicio = final;
+        }
+
+        if (inicio < 100m)
+        {
+            segmentos.Add(
+                $"#3d3d3d {inicio.ToString(CultureInfo.InvariantCulture)}% 100%");
         }
 
         return $"conic-gradient({string.Join(", ", segmentos)})";
@@ -882,6 +1119,15 @@ public sealed class HomeController : Controller
 
     private static string Porcentaje(decimal valor) =>
         valor.ToString("N1", new CultureInfo("es-CR")) + " %";
+
+    private static int OrdenRangoEdad(string valor)
+    {
+        var coincidencia = Regex.Match(valor, @"\d+");
+        return coincidencia.Success
+            && int.TryParse(coincidencia.Value, out var minimo)
+                ? minimo
+                : int.MaxValue;
+    }
 
     private static readonly int[] DiasSemana = [2, 3, 4, 5, 6, 7, 1];
 

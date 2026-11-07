@@ -8,15 +8,19 @@ public sealed class DashboardViewModel
 
     public Dictionary<string, string> ParametrosExplorador { get; set; } = new();
     public int TotalIncidentes { get; set; }
+    public int TotalPersonas { get; set; }
+    public int TotalVictimas { get; set; }
     public IReadOnlyList<DashboardKpiViewModel> Indicadores { get; set; } = [];
     public IReadOnlyList<DashboardDatoViewModel> Provincias { get; set; } = [];
     public IReadOnlyList<string> FranjasMatriz { get; set; } = [];
     public IReadOnlyList<DashboardFilaTemporalViewModel> MatrizTemporal { get; set; } = [];
-    public IReadOnlyList<DashboardDatoViewModel> TiposAccidente { get; set; } = [];
+    public IReadOnlyList<DashboardDatoViewModel> Vehiculos { get; set; } = [];
+    public IReadOnlyList<DashboardDemografiaViewModel> Demografia { get; set; } = [];
     public IReadOnlyList<DashboardDatoViewModel> Severidades { get; set; } = [];
     public IReadOnlyList<DashboardRutaViewModel> Rutas { get; set; } = [];
-    public string TipoAccidenteDonutCss { get; set; } = "#3d3d3d";
+    public string VehiculoDonutCss { get; set; } = "#3d3d3d";
     public string SeveridadPieCss { get; set; } = "#3d3d3d";
+    public IReadOnlyList<string> AvisosAlcance { get; set; } = [];
 }
 
 public sealed class DashboardFiltrosViewModel
@@ -33,6 +37,9 @@ public sealed class DashboardFiltrosViewModel
     public string? Clima { get; set; }
     public string? EstadoCalzada { get; set; }
     public string? Severidad { get; set; }
+    public string? Vehiculo { get; set; }
+    public string? Genero { get; set; }
+    public string? RangoEdad { get; set; }
 }
 
 public sealed class DashboardOpcionesFiltros
@@ -49,6 +56,9 @@ public sealed class DashboardOpcionesFiltros
     public IReadOnlyList<string> Climas { get; set; } = [];
     public IReadOnlyList<string> EstadosCalzada { get; set; } = [];
     public IReadOnlyList<string> Severidades { get; set; } = [];
+    public IReadOnlyList<string> Vehiculos { get; set; } = [];
+    public IReadOnlyList<string> Generos { get; set; } = [];
+    public IReadOnlyList<string> RangosEdad { get; set; } = [];
 }
 
 public sealed class DashboardKpiViewModel
@@ -77,6 +87,14 @@ public sealed class DashboardRutaViewModel
     public string Ruta { get; set; } = "";
     public int Cantidad { get; set; }
     public decimal PorcentajeAcumulado { get; set; }
+}
+
+public sealed class DashboardDemografiaViewModel
+{
+    public string RangoEdad { get; set; } = "";
+    public int Hombres { get; set; }
+    public int Mujeres { get; set; }
+    public int SexoNoInformado { get; set; }
 }
 
 public sealed class GuardarFiltrosRequest

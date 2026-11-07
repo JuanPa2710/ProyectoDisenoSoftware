@@ -29,7 +29,10 @@ public static class FiltrosDocumento
             TipoAccidente = Texto(filtros.TipoAccidente),
             Clima = Texto(filtros.Clima),
             EstadoCalzada = Texto(filtros.EstadoCalzada),
-            Severidad = Texto(filtros.Severidad)
+            Severidad = Texto(filtros.Severidad),
+            Vehiculo = Texto(filtros.Vehiculo),
+            Genero = Texto(filtros.Genero),
+            RangoEdad = Texto(filtros.RangoEdad)
         };
     }
 
@@ -49,8 +52,9 @@ public static class FiltrosDocumento
             { "condicion_climatica", TextoOTodos(filtros.Clima) },
             { "estado_calzada", TextoOTodos(filtros.EstadoCalzada) },
             { "severidad", TextoOTodos(filtros.Severidad) },
-            { "genero", BsonNull.Value },
-            { "rango_edad", BsonNull.Value }
+            { "tipo_vehiculo", TextoOTodos(filtros.Vehiculo) },
+            { "genero", TextoOTodos(filtros.Genero) },
+            { "rango_edad", TextoOTodos(filtros.RangoEdad) }
         };
 
     private static BsonValue TextoOTodos(string? valor, string porDefecto = "Todos") =>

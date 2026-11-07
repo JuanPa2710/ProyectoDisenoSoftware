@@ -20,7 +20,10 @@
         ("Tipo de accidente", Model.Filtros.TipoAccidente ?? ""),
         ("Clima", Model.Filtros.Clima ?? ""),
         ("Calzada", Model.Filtros.EstadoCalzada ?? ""),
-        ("Severidad", Model.Filtros.Severidad ?? "")
+        ("Severidad", Model.Filtros.Severidad ?? ""),
+        ("Vehículo", Model.Filtros.Vehiculo ?? ""),
+        ("Género", Model.Filtros.Genero ?? ""),
+        ("Rango de edad", Model.Filtros.RangoEdad ?? "")
     }.Where(filtro => !string.IsNullOrWhiteSpace(filtro.Valor)).ToList();
 
     string Formatear(int valor) => valor.ToString("N0", cultura);
@@ -41,6 +44,11 @@
   @if (!string.IsNullOrWhiteSpace(Model.ErrorMongoDB))
   {
     <div class="dashboard-message dashboard-message--error" role="alert">@Model.ErrorMongoDB</div>
+  }
+
+  @foreach (var aviso in Model.AvisosAlcance)
+  {
+    <div class="dashboard-message dashboard-message--scope" role="note">@aviso</div>
   }
 
   <div id="guardar-filtros-aviso" class="dashboard-message" role="status" hidden></div>
@@ -86,8 +94,9 @@
       <label class="filter-field"><span>Condición climática</span><select asp-for="Filtros.Clima"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Climas) { <option value="@valor">@valor</option> }</select></label>
       <label class="filter-field"><span>Estado de calzada</span><select asp-for="Filtros.EstadoCalzada"><option value="">Todos</option>@foreach (var valor in Model.Opciones.EstadosCalzada) { <option value="@valor">@valor</option> }</select></label>
       <label class="filter-field"><span>Severidad</span><select asp-for="Filtros.Severidad"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Severidades) { <option value="@valor">@valor</option> }</select></label>
-      <div class="filter-field filter-field--unavailable"><span>Género</span><div class="filter-unavailable">No disponible</div></div>
-      <div class="filter-field filter-field--unavailable"><span>Rango de edad</span><div class="filter-unavailable">No disponible</div></div>
+      <label class="filter-field"><span>Tipo de vehículo</span><select asp-for="Filtros.Vehiculo"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Vehiculos) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Género</span><select asp-for="Filtros.Genero"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Generos) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Rango de edad</span><select asp-for="Filtros.RangoEdad"><option value="">Todos</option>@foreach (var valor in Model.Opciones.RangosEdad) { <option value="@valor">@valor</option> }</select></label>
     </div>
     <div class="active-filters">
       <div class="active-filters__items">
@@ -133,19 +142,46 @@
     </article>
 
     <article class="dashboard-card chart-card vehicle-card">
-      <header class="chart-card__header"><h2>Tipo de accidente registrado</h2><span>% de incidentes</span></header>
+      <header class="chart-card__header"><h2>Vehículo de las personas involucradas</h2><span>% de registros de personas · cinco principales</span></header>
       <div class="vehicle-card__content">
-        <div class="donut" style="background: @Model.TipoAccidenteDonutCss"><div><strong>@Formatear(Model.TotalIncidentes)</strong><span>incidentes</span></div></div>
+        <div class="donut" style="background: @Model.VehiculoDonutCss"><div><strong>@Formatear(Model.TotalPersonas)</strong><span>personas</span></div></div>
         <ul class="chart-legend">
-          @if (Model.TiposAccidente.Count == 0) { <li class="dashboard-empty">No hay datos para mostrar.</li> }
-          @foreach (var tipo in Model.TiposAccidente.Select((dato, indice) => new { dato, indice })) { <li><i class="legend-@((tipo.indice % 5) + 1)"></i><span>@tipo.dato.Etiqueta</span><b>@Porcentaje(tipo.dato.Porcentaje)</b></li> }
+          @if (Model.Vehiculos.Count == 0) { <li class="dashboard-empty">No hay datos para mostrar.</li> }
+          @foreach (var tipo in Model.Vehiculos.Select((dato, indice) => new { dato, indice })) { <li><i class="legend-@((tipo.indice % 5) + 1)"></i><span>@tipo.dato.Etiqueta</span><b>@Porcentaje(tipo.dato.Porcentaje)</b></li> }
         </ul>
       </div>
     </article>
 
     <article class="dashboard-card chart-card demographic-card">
-      <header class="chart-card__header"><h2>Perfil demográfico de víctimas</h2></header>
-      <div class="dashboard-unavailable"><strong>Dato no disponible</strong><span>La fuente actual no registra víctimas, género ni edades.</span></div>
+      <header class="chart-card__header"><h2>Perfil demográfico de víctimas</h2><span>Heridos y fallecidos en sitio</span></header>
+      @if (Model.Demografia.Count == 0)
+      {
+        <p class="dashboard-empty">No hay víctimas para los filtros seleccionados.</p>
+      }
+      else
+      {
+        var maximoDemografico = Math.Max(1, Model.Demografia
+          .SelectMany(fila => new[] { fila.Hombres, fila.Mujeres })
+          .DefaultIfEmpty().Max());
+        var sexoNoInformado = Model.Demografia.Sum(fila => fila.SexoNoInformado);
+        <div class="demographic-legend"><span><i></i>Hombres</span><span><i></i>Mujeres</span></div>
+        <div class="demographic-bars">
+          @foreach (var fila in Model.Demografia)
+          {
+            var anchoHombres = fila.Hombres * 100m / maximoDemografico;
+            var anchoMujeres = fila.Mujeres * 100m / maximoDemografico;
+            <div>
+              <span class="men" style="width:@anchoHombres%" title="@fila.Hombres hombres">@(fila.Hombres == 0 ? "" : Formatear(fila.Hombres))</span>
+              <b>@fila.RangoEdad</b>
+              <span class="women" style="width:@anchoMujeres%" title="@fila.Mujeres mujeres">@(fila.Mujeres == 0 ? "" : Formatear(fila.Mujeres))</span>
+            </div>
+          }
+        </div>
+        @if (sexoNoInformado > 0)
+        {
+          <p class="demographic-summary">Sexo no informado: @Formatear(sexoNoInformado)</p>
+        }
+      }
     </article>
 
     <article class="dashboard-card chart-card severity-card">
