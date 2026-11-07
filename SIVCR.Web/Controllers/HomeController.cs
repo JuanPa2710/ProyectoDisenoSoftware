@@ -139,6 +139,93 @@ public sealed class HomeController : Controller
         }
     }
 
+    [HttpGet]
+    public async Task<IActionResult> OpcionesGeograficas(
+        string? provincia,
+        string? canton,
+        string? distrito,
+        string? ruta)
+    {
+        provincia = provincia?.Trim();
+        canton = canton?.Trim();
+        distrito = distrito?.Trim();
+        ruta = ruta?.Trim();
+
+        if (provincia?.Length > 120 || canton?.Length > 120
+            || distrito?.Length > 120 || ruta?.Length > 120)
+            return BadRequest(new { mensaje = "La ubicación seleccionada no es válida." });
+
+        try
+        {
+            if (mongoClient is null)
+                throw new InvalidOperationException("MongoDB no está configurado.");
+
+            var coleccion = ObtenerColeccion();
+            var fb = Builders<BsonDocument>.Filter;
+            var ubicacion = new List<FilterDefinition<BsonDocument>>();
+            if (!string.IsNullOrWhiteSpace(provincia))
+                ubicacion.Add(fb.Eq("ubicacion.provincia", provincia));
+            if (!string.IsNullOrWhiteSpace(canton))
+                ubicacion.Add(fb.Eq("ubicacion.canton", canton));
+            if (!string.IsNullOrWhiteSpace(distrito))
+                ubicacion.Add(fb.Eq("ubicacion.distrito", distrito));
+
+            var conRuta = ubicacion.ToList();
+            if (!string.IsNullOrWhiteSpace(ruta))
+                conRuta.Add(fb.Eq("ubicacion.ruta", ruta));
+            var filtroUbicacion = conRuta.Count == 0 ? fb.Empty : fb.And(conRuta);
+
+            var provincias = string.IsNullOrWhiteSpace(ruta)
+                ? (string.IsNullOrWhiteSpace(provincia)
+                    ? await ObtenerTextosAsync(coleccion, "ubicacion.provincia", fb.Empty)
+                    : [provincia])
+                : await ObtenerTextosAsync(coleccion, "ubicacion.provincia", filtroUbicacion);
+
+            var filtroCantones = string.IsNullOrWhiteSpace(ruta)
+                ? (!string.IsNullOrWhiteSpace(provincia)
+                    ? fb.Eq("ubicacion.provincia", provincia)
+                    : fb.Empty)
+                : filtroUbicacion;
+            var cantones = string.IsNullOrWhiteSpace(provincia) && string.IsNullOrWhiteSpace(ruta)
+                ? Array.Empty<string>()
+                : await ObtenerTextosAsync(coleccion, "ubicacion.canton", filtroCantones);
+
+            var filtroDistritos = new List<FilterDefinition<BsonDocument>>();
+            if (!string.IsNullOrWhiteSpace(provincia))
+                filtroDistritos.Add(fb.Eq("ubicacion.provincia", provincia));
+            if (!string.IsNullOrWhiteSpace(canton))
+                filtroDistritos.Add(fb.Eq("ubicacion.canton", canton));
+            if (!string.IsNullOrWhiteSpace(ruta))
+                filtroDistritos.Add(fb.Eq("ubicacion.ruta", ruta));
+            var distritos = string.IsNullOrWhiteSpace(canton)
+                ? Array.Empty<string>()
+                : await ObtenerTextosAsync(
+                    coleccion,
+                    "ubicacion.distrito",
+                    filtroDistritos.Count == 0 ? fb.Empty : fb.And(filtroDistritos));
+
+            var rutas = await ObtenerTextosAsync(coleccion, "ubicacion.ruta", filtroUbicacion);
+
+            return Ok(new
+            {
+                provincias,
+                cantones,
+                distritos,
+                rutas = OrdenarRutas(rutas)
+            });
+        }
+        catch (MongoException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { mensaje = "No fue posible consultar las ubicaciones." });
+        }
+        catch (InvalidOperationException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { mensaje = "MongoDB no está configurado para esta ejecución." });
+        }
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> GuardarFiltrosActuales(string? nombre)
@@ -661,7 +748,7 @@ public sealed class HomeController : Controller
             Provincias = await provincias,
             Cantones = await cantones,
             Distritos = await distritos,
-            Rutas = await rutas,
+            Rutas = OrdenarRutas(await rutas),
             Anios = await anios,
             Meses = await meses,
             DiasSemana = await dias,
@@ -752,6 +839,24 @@ public sealed class HomeController : Controller
             .OrderBy(valor => valor)
             .ToList();
     }
+
+    private static IReadOnlyList<string> OrdenarRutas(
+        IReadOnlyList<string> rutas) =>
+        rutas
+            .OrderBy(ruta => NumeroRuta(ruta).HasValue ? 0 : 1)
+            .ThenBy(ruta => NumeroRuta(ruta) ?? int.MaxValue)
+            .ThenBy(ruta => ruta, StringComparer.Create(
+                new CultureInfo("es-CR"), true))
+            .ToList();
+
+    private static int? NumeroRuta(string ruta) =>
+        int.TryParse(
+            ruta,
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out var numero)
+                ? numero
+                : null;
 
     private static async Task<IReadOnlyList<DashboardDatoViewModel>> AgruparAsync(
         IMongoCollection<BsonDocument> coleccion,
@@ -907,6 +1012,8 @@ public sealed class HomeController : Controller
         AsignarPorcentajes(provincias, total);
         AsignarPorcentajes(vehiculos, totalPersonas);
         AsignarPorcentajes(severidades, total);
+        foreach (var severidad in severidades)
+            severidad.Color = ColorSeveridad(severidad.Etiqueta);
 
         var tasa = totalNacional == 0
             ? (decimal?)null
@@ -916,6 +1023,26 @@ public sealed class HomeController : Controller
             : filtros.Canton is not null ? filtros.Canton
             : filtros.Provincia is not null ? filtros.Provincia
             : "Total nacional";
+        var cantidadLeves = severidades
+            .Where(dato => dato.Etiqueta.Contains("leve", StringComparison.OrdinalIgnoreCase))
+            .Sum(dato => dato.Cantidad);
+        var cantidadMuertesOGraves = severidades
+            .Where(dato => dato.Etiqueta.Contains("muerto", StringComparison.OrdinalIgnoreCase)
+                || dato.Etiqueta.Contains("grave", StringComparison.OrdinalIgnoreCase))
+            .Sum(dato => dato.Cantidad);
+        var totalPonderable = cantidadLeves + cantidadMuertesOGraves;
+        var indiceSeveridad = total == 0 || totalPonderable != total
+            ? NoDisponible(
+                "Índice de severidad",
+                "No todas las categorías de severidad tienen un peso definido.")
+            : new DashboardKpiViewModel
+            {
+                Titulo = "Índice de severidad",
+                Valor = ((cantidadLeves + 2m * cantidadMuertesOGraves) / total)
+                    .ToString("N2", CultureInfo.GetCultureInfo("es-CR")) + " / 2",
+                Detalle = "Escala 1–2: 1 = solo heridos leves; 2 = muertos o heridos graves",
+                Formula = "(1 × incidentes leves + 2 × incidentes con muertos o graves) / incidentes filtrados"
+            };
 
         modelo.Indicadores =
         [
@@ -935,18 +1062,14 @@ public sealed class HomeController : Controller
                     : $"{ambitoTasa} respecto al total nacional comparable",
                 Formula = "N del ámbito geográfico / N nacional con iguales condiciones × 100"
             },
-            NoDisponible("Índice de severidad", "Faltan los pesos W1, W2 y W3 definidos por el SAD."),
-            NoDisponible("Tiempo promedio de respuesta", "La fuente no incluye tiempos de atención o llegada."),
+            indiceSeveridad,
             new DashboardKpiViewModel
             {
                 Titulo = "Víctimas",
                 Valor = Formatear(totalVictimas),
                 Detalle = "Personas heridas o fallecidas en sitio",
                 Formula = "Muerte en sitio + heridos graves + heridos leves"
-            },
-            NoDisponible(
-                "Fatalidad por vehículo",
-                "No existe una llave persona–accidente para identificar accidentes con fallecidos por vehículo.")
+            }
         ];
 
         modelo.Provincias = provincias;
@@ -954,7 +1077,9 @@ public sealed class HomeController : Controller
         modelo.Demografia = demografia;
         modelo.Severidades = severidades;
         modelo.VehiculoDonutCss = CrearGraficoCircular(modelo.Vehiculos);
-        modelo.SeveridadPieCss = CrearGraficoCircular(modelo.Severidades);
+        modelo.SeveridadPieCss = CrearGraficoCircular(
+            modelo.Severidades,
+            modelo.Severidades.Select(dato => dato.Color).ToArray());
 
         var avisos = new List<string>();
         if (TieneFiltrosSoloDeAccidentes(filtros))
@@ -1048,14 +1173,15 @@ public sealed class HomeController : Controller
     }
 
     private static string CrearGraficoCircular(
-        IReadOnlyList<DashboardDatoViewModel> datos)
+        IReadOnlyList<DashboardDatoViewModel> datos,
+        IReadOnlyList<string>? coloresPersonalizados = null)
     {
         if (datos.Count == 0)
             return "#3d3d3d";
 
-        var colores = new[]
+        var colores = coloresPersonalizados ?? new[]
         {
-            "#479ef5", "#2886de", "#7e57c2", "#f5a623", "#53c3a6"
+            "#479ef5", "#2886de", "#7e57c2", "#f5a623", "#d55b8c"
         };
         var inicio = 0m;
         var segmentos = new List<string>();
@@ -1064,7 +1190,7 @@ public sealed class HomeController : Controller
         {
             var final = Math.Min(100m, inicio + datos[indice].Porcentaje);
             segmentos.Add(
-                $"{colores[indice % colores.Length]} {inicio.ToString(CultureInfo.InvariantCulture)}% {final.ToString(CultureInfo.InvariantCulture)}%");
+                $"{colores[indice % colores.Count]} {inicio.ToString(CultureInfo.InvariantCulture)}% {final.ToString(CultureInfo.InvariantCulture)}%");
             inicio = final;
         }
 
@@ -1076,6 +1202,17 @@ public sealed class HomeController : Controller
 
         return $"conic-gradient({string.Join(", ", segmentos)})";
     }
+
+    private static string ColorSeveridad(string etiqueta) =>
+        etiqueta.Contains("muerto", StringComparison.OrdinalIgnoreCase)
+            || etiqueta.Contains("grave", StringComparison.OrdinalIgnoreCase)
+                ? "#f5a623"
+                : etiqueta.Contains("leve", StringComparison.OrdinalIgnoreCase)
+                    ? "#e34f55"
+                    : etiqueta.Contains("daño", StringComparison.OrdinalIgnoreCase)
+                        || etiqueta.Contains("material", StringComparison.OrdinalIgnoreCase)
+                            ? "#5e9c75"
+                            : "#479ef5";
 
     private static string ObtenerTexto(BsonDocument documento, params string[] campos)
     {

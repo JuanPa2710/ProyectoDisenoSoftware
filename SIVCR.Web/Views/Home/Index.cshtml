@@ -79,13 +79,14 @@
     </form>
   </dialog>
 
-  <form class="dashboard-card dashboard-filters" method="get" aria-labelledby="filters-title">
+  <form class="dashboard-card dashboard-filters" method="get" aria-labelledby="filters-title" data-geography-url="@Url.Action("OpcionesGeograficas", "Home")">
     <h2 id="filters-title" class="dashboard-card__title"><svg class="dashboard-card__title-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg>Filtros multidimensionales</h2>
+    <p class="dashboard-filters__hint">Provincia, cantón y distrito se relacionan automáticamente. Los resultados del dashboard se actualizan únicamente al pulsar “Aplicar filtros”.</p>
     <div class="filter-grid">
-      <label class="filter-field"><span>Provincia</span><select asp-for="Filtros.Provincia"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Provincias) { <option value="@valor">@valor</option> }</select></label>
-      <label class="filter-field"><span>Cantón</span><select asp-for="Filtros.Canton"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Cantones) { <option value="@valor">@valor</option> }</select></label>
-      <label class="filter-field"><span>Distrito</span><select asp-for="Filtros.Distrito"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Distritos) { <option value="@valor">@valor</option> }</select></label>
-      <label class="filter-field"><span>Ruta</span><select asp-for="Filtros.Ruta"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Rutas) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Provincia</span><select asp-for="Filtros.Provincia" data-geography="provincia"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Provincias) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Cantón</span><select asp-for="Filtros.Canton" data-geography="canton" disabled="@(string.IsNullOrWhiteSpace(Model.Filtros.Provincia))" title="Seleccione una provincia"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Cantones) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Distrito</span><select asp-for="Filtros.Distrito" data-geography="distrito" disabled="@(string.IsNullOrWhiteSpace(Model.Filtros.Canton))" title="Seleccione un cantón"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Distritos) { <option value="@valor">@valor</option> }</select></label>
+      <label class="filter-field"><span>Ruta</span><select asp-for="Filtros.Ruta" data-geography="ruta"><option value="">Todas</option>@foreach (var valor in Model.Opciones.Rutas) { <option value="@valor">@valor</option> }</select></label>
       <label class="filter-field"><span>Año</span><select asp-for="Filtros.Anio"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Anios) { <option value="@valor">@valor</option> }</select></label>
       <label class="filter-field"><span>Mes</span><select asp-for="Filtros.Mes"><option value="">Todos</option>@foreach (var valor in Model.Opciones.Meses) { <option value="@valor">@Mes(valor)</option> }</select></label>
       <label class="filter-field"><span>Día de la semana</span><select asp-for="Filtros.DiaSemana"><option value="">Todos</option>@foreach (var valor in Model.Opciones.DiasSemana) { <option value="@valor">@Dia(valor)</option> }</select></label>
@@ -119,10 +120,14 @@
     <article class="dashboard-card chart-card geographic-card">
       <header class="chart-card__header"><h2>Distribución geográfica</h2><span>Incidentes por provincia</span></header>
       <div class="geographic-card__content">
-        <div class="map-placeholder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16m6-14v16" /></svg><span>Mapa coroplético por provincia<br />pendiente de capa geográfica</span></div>
+        <div class="province-map" data-province-map data-source="@Url.Content("~/data/provincias-cr.geojson")">
+          <svg class="province-map__svg" viewBox="0 0 320 330" role="img" aria-label="Mapa de Costa Rica con incidentes por provincia"><g class="province-map__shapes"></g></svg>
+          <div class="province-map__tooltip" role="status" hidden></div>
+          <div class="province-map__legend" aria-label="Escala de incidentes"><span>Menos</span><i></i><span>Más</span></div>
+        </div>
         <div class="province-ranking">
           @if (Model.Provincias.Count == 0) { <p class="dashboard-empty">No hay incidentes para los filtros seleccionados.</p> }
-          @foreach (var provincia in Model.Provincias) { <div class="bar-row"><span>@provincia.Etiqueta</span><div class="bar-track"><i style="width: @provincia.Porcentaje%"></i></div><strong>@Formatear(provincia.Cantidad)</strong></div> }
+          @foreach (var provincia in Model.Provincias) { <div class="bar-row" data-province="@provincia.Etiqueta" data-count="@provincia.Cantidad" data-percentage="@provincia.Porcentaje"><span>@provincia.Etiqueta</span><div class="bar-track"><i style="width: @provincia.Porcentaje%"></i></div><strong>@Formatear(provincia.Cantidad)</strong></div> }
         </div>
       </div>
     </article>
@@ -190,7 +195,7 @@
         <div class="pie" style="background: @Model.SeveridadPieCss"></div>
         <div class="severity-kpis">
           @if (Model.Severidades.Count == 0) { <p class="dashboard-empty">No hay datos para mostrar.</p> }
-          @foreach (var severidad in Model.Severidades.Select((dato, indice) => new { dato, indice })) { <div><span><i class="severity-@((severidad.indice % 4) + 1)"></i>@severidad.dato.Etiqueta</span><strong>@Formatear(severidad.dato.Cantidad)</strong><small>@Porcentaje(severidad.dato.Porcentaje) de los incidentes</small></div> }
+          @foreach (var severidad in Model.Severidades) { <div><span><i style="background-color:@severidad.Color"></i>@severidad.Etiqueta</span><strong>@Formatear(severidad.Cantidad)</strong><small>@Porcentaje(severidad.Porcentaje) de los incidentes</small></div> }
         </div>
       </div>
     </article>
@@ -205,6 +210,15 @@
   </section>
 </section>
 
+<div id="dashboard-loading" class="dashboard-loading-overlay" hidden>
+  <div class="dashboard-loading-card" role="status" aria-live="polite">
+    <span class="dashboard-loading-spinner" aria-hidden="true"></span>
+    <strong>Actualizando dashboard</strong>
+    <span>Consultando los registros seleccionados…</span>
+  </div>
+</div>
+
 @section Scripts {
     <script src="~/js/dashboard-filtros.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard-mapa.js" asp-append-version="true"></script>
 }

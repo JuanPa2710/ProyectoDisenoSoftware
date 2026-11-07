@@ -74,6 +74,7 @@ public sealed class DashboardDatoViewModel
     public string Etiqueta { get; set; } = "";
     public int Cantidad { get; set; }
     public decimal Porcentaje { get; set; }
+    public string Color { get; set; } = "#479ef5";
 }
 
 public sealed class DashboardFilaTemporalViewModel
