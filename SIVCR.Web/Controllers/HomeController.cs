@@ -2,9 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using SIVCR.Web.Models;
+using SIVCR.Web.Services;
 using System.Diagnostics;
 using System.Globalization;
-using SIVCR.Web.Services;
+using System.Text.Json;
 
 namespace SIVCR.Web.Controllers;
 
@@ -27,13 +28,20 @@ public sealed class HomeController : Controller
     {
         var modelo = new DashboardViewModel { Filtros = filtros };
 
+        // "Variable global": los filtros seleccionados quedan en la sesión
+        // para mostrarlos y guardarlos desde "Filtros guardados".
+        GuardarFiltrosEnSesion(filtros);
+
+        modelo.ParametrosExplorador = ConstruirParametros(
+            CrearDocumentoFiltros(LimpiarFiltros(filtros)));
+
         try
         {
             if (mongoClient is null)
                 throw new InvalidOperationException("MongoDB no está configurado.");
 
             var coleccion = ObtenerColeccion();
-            var filtro = MongoFilterBuilder.CrearFiltro(filtros);
+            var filtro = CrearFiltro(filtros);
 
             // Todas las consultas se ejecutan en MongoDB. La Web recibe
             // únicamente conteos y agrupaciones, no los documentos completos.
@@ -88,43 +96,7 @@ public sealed class HomeController : Controller
 
         try
         {
-            if (mongoClient is null)
-                throw new InvalidOperationException("MongoDB no está configurado.");
-
-            // Estructura de la colección: los combos sin selección se guardan
-            // con su etiqueta por defecto ("Todas"/"Todos"). Género y rango de
-            // edad aún no existen en la fuente, por eso van en null.
-            var documento = new BsonDocument
-            {
-                { "nombre_filtro", nombre },
-                {
-                    "filtros", new BsonDocument
-                    {
-                        { "provincia", TextoOTodos(filtros.Provincia, "Todas") },
-                        { "canton", TextoOTodos(filtros.Canton) },
-                        { "distrito", TextoOTodos(filtros.Distrito) },
-                        { "ruta", TextoOTodos(filtros.Ruta) },
-                        { "anio", NumeroOTodos(filtros.Anio) },
-                        { "mes", NumeroOTodos(filtros.Mes) },
-                        { "dia_semana", NumeroOTodos(filtros.DiaSemana) },
-                        { "franja_horaria", TextoOTodos(filtros.FranjaHoraria) },
-                        { "tipo_accidente", TextoOTodos(filtros.TipoAccidente) },
-                        { "condicion_climatica", TextoOTodos(filtros.Clima) },
-                        { "estado_calzada", TextoOTodos(filtros.EstadoCalzada) },
-                        { "severidad", TextoOTodos(filtros.Severidad) },
-                        { "genero", BsonNull.Value },
-                        { "rango_edad", BsonNull.Value }
-                    }
-                },
-                { "fecha_creacion", DateTime.UtcNow }
-            };
-
-            var coleccionFiltros = mongoClient
-                .GetDatabase(configuracion["MongoDB:Database"])
-                .GetCollection<BsonDocument>(
-                    configuracion["MongoDB:CollectionFiltros"] ?? "filtros");
-
-            await coleccionFiltros.InsertOneAsync(documento);
+            var documento = await InsertarCombinacionAsync(nombre, filtros);
 
             return Ok(new
             {
@@ -142,6 +114,39 @@ public sealed class HomeController : Controller
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { mensaje = "MongoDB no está configurado para esta ejecución." });
         }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GuardarFiltrosActuales(string? nombre)
+    {
+        var nombreLimpio = nombre?.Trim();
+        var filtros = LeerFiltrosDeSesion();
+
+        if (string.IsNullOrWhiteSpace(nombreLimpio))
+            TempData["ErrorFiltros"] = "Escribe un nombre para la combinación.";
+        else if (nombreLimpio.Length > 80)
+            TempData["ErrorFiltros"] = "El nombre no puede superar los 80 caracteres.";
+        else if (!TieneFiltrosActivos(filtros))
+            TempData["ErrorFiltros"] = "No hay filtros seleccionados en el dashboard.";
+        else
+        {
+            try
+            {
+                await InsertarCombinacionAsync(nombreLimpio, filtros);
+                TempData["MensajeFiltros"] = $"Filtros «{nombreLimpio}» guardados correctamente.";
+            }
+            catch (MongoException)
+            {
+                TempData["ErrorFiltros"] = "No fue posible guardar los filtros en MongoDB.";
+            }
+            catch (InvalidOperationException)
+            {
+                TempData["ErrorFiltros"] = "MongoDB no está configurado para esta ejecución.";
+            }
+        }
+
+        return RedirectToAction(nameof(FiltrosGuardados));
     }
 
     [HttpPost]
@@ -187,7 +192,9 @@ public sealed class HomeController : Controller
         var modelo = new FiltrosGuardadosViewModel
         {
             Mensaje = TempData["MensajeFiltros"] as string,
-            ErrorMongoDB = TempData["ErrorFiltros"] as string
+            ErrorMongoDB = TempData["ErrorFiltros"] as string,
+            FiltrosActuales = ExtraerEtiquetas(
+                CrearDocumentoFiltros(LeerFiltrosDeSesion()))
         };
 
         try
@@ -204,15 +211,30 @@ public sealed class HomeController : Controller
                 .Limit(100)
                 .ToListAsync();
 
-            modelo.Filtros = documentos.Select(MapearFiltroGuardado).ToList();
+            // "Registros": cuántos incidentes devuelve hoy cada combinación guardada.
+            var incidencias = ObtenerColeccion();
+            var conteos = await Task.WhenAll(
+                documentos.Select(d => ContarResultadosAsync(incidencias, d)));
+
+            modelo.Filtros = documentos
+                .Select((d, indice) => MapearFiltroGuardado(d, conteos[indice]))
+                .ToList();
+
+            var consultas = await ObtenerColeccionHistorial()
+                .Find(FilterDefinition<BsonDocument>.Empty)
+                .Sort(Builders<BsonDocument>.Sort.Descending("fecha_consulta"))
+                .Limit(5)
+                .ToListAsync();
+
+            modelo.Historial = consultas.Select(MapearConsultaHistorial).ToList();
         }
         catch (MongoException)
         {
-            modelo.ErrorMongoDB = "No fue posible conectar o consultar MongoDB.";
+            modelo.ErrorMongoDB ??= "No fue posible conectar o consultar MongoDB.";
         }
         catch (InvalidOperationException)
         {
-            modelo.ErrorMongoDB = "MongoDB no está configurado para esta ejecución.";
+            modelo.ErrorMongoDB ??= "MongoDB no está configurado para esta ejecución.";
         }
 
         return View(modelo);
@@ -245,26 +267,82 @@ public sealed class HomeController : Controller
         ("rango_edad", "Rango de edad", null)
     ];
 
-    private static FiltroGuardadoViewModel MapearFiltroGuardado(BsonDocument documento)
+    private const string ClaveFiltrosSesion = "FiltrosDashboard";
+
+    private void GuardarFiltrosEnSesion(DashboardFiltrosViewModel filtros) =>
+        HttpContext.Session.SetString(
+            ClaveFiltrosSesion,
+            JsonSerializer.Serialize(LimpiarFiltros(filtros)));
+
+    private DashboardFiltrosViewModel LeerFiltrosDeSesion()
+    {
+        var json = HttpContext.Session.GetString(ClaveFiltrosSesion);
+        if (string.IsNullOrEmpty(json))
+            return new DashboardFiltrosViewModel();
+
+        try
+        {
+            return LimpiarFiltros(
+                JsonSerializer.Deserialize<DashboardFiltrosViewModel>(json));
+        }
+        catch (JsonException)
+        {
+            return new DashboardFiltrosViewModel();
+        }
+    }
+
+    private static BsonDocument CrearDocumentoFiltros(DashboardFiltrosViewModel filtros) =>
+        FiltrosDocumento.Crear(filtros);
+
+    // Etiquetas visibles ("Provincia: San José") solo de los filtros activos.
+    private static List<(string Nombre, string Valor)> ExtraerEtiquetas(BsonDocument filtros)
+    {
+        var etiquetas = new List<(string Nombre, string Valor)>();
+        foreach (var (campo, etiqueta, _) in CamposFiltroGuardado)
+        {
+            if (filtros.TryGetValue(campo, out var valor)
+                && FormatearValorFiltroGuardado(campo, valor) is { } texto)
+            {
+                etiquetas.Add((etiqueta, texto));
+            }
+        }
+        return etiquetas;
+    }
+
+    private async Task<BsonDocument> InsertarCombinacionAsync(
+        string nombre, DashboardFiltrosViewModel filtros)
+    {
+        if (mongoClient is null)
+            throw new InvalidOperationException("MongoDB no está configurado.");
+
+        var documento = new BsonDocument
+        {
+            { "nombre_filtro", nombre },
+            { "filtros", CrearDocumentoFiltros(filtros) },
+            { "fecha_creacion", DateTime.UtcNow }
+        };
+
+        await mongoClient
+            .GetDatabase(configuracion["MongoDB:Database"])
+            .GetCollection<BsonDocument>(
+                configuracion["MongoDB:CollectionFiltros"] ?? "filtros")
+            .InsertOneAsync(documento);
+
+        return documento;
+    }
+
+    private static FiltroGuardadoViewModel MapearFiltroGuardado(
+        BsonDocument documento, long? totalRegistros)
     {
         var etiquetas = new List<(string Nombre, string Valor)>();
         var parametros = new Dictionary<string, string>();
 
-        if (documento.TryGetValue("filtros", out var filtros) && filtros.IsBsonDocument)
+        if (documento.TryGetValue("filtros", out var valorFiltros) && valorFiltros.IsBsonDocument)
         {
-            foreach (var (campo, etiqueta, parametro) in CamposFiltroGuardado)
-            {
-                if (!filtros.AsBsonDocument.TryGetValue(campo, out var valor))
-                    continue;
+            var filtros = valorFiltros.AsBsonDocument;
+            etiquetas = ExtraerEtiquetas(filtros);
 
-                var texto = FormatearValorFiltroGuardado(campo, valor);
-                if (texto is not null)
-                    etiquetas.Add((etiqueta, texto));
-
-                var crudo = ValorCrudoFiltroGuardado(valor);
-                if (parametro is not null && crudo is not null)
-                    parametros["Filtros." + parametro] = crudo;
-            }
+            parametros = ConstruirParametros(filtros);
         }
 
         var fecha = documento.TryGetValue("fecha_creacion", out var f) && f.IsBsonDateTime
@@ -272,28 +350,23 @@ public sealed class HomeController : Controller
                 .ToString("dd/MM/yyyy", new CultureInfo("es-CR"))
             : "";
 
-        // Si el documento trae total_registros se muestra; si no, "No disponible".
-        var total = documento.TryGetValue("total_registros", out var t)
-            && (t.IsInt32 || t.IsInt64)
-            ? t.ToInt64().ToString("N0", new CultureInfo("es-CR"))
-            : "No disponible";
+        var total = totalRegistros?.ToString("N0", new CultureInfo("es-CR"))
+            ?? "No disponible";
 
         return new FiltroGuardadoViewModel
         {
-            TotalRegistros = total,
             Id = documento.TryGetValue("_id", out var id) ? id.ToString()! : "",
             Nombre = documento.TryGetValue("nombre_filtro", out var nombre) && nombre.IsString
                 && !string.IsNullOrWhiteSpace(nombre.AsString)
                 ? nombre.AsString
                 : "(Sin nombre)",
             Fecha = fecha,
+            TotalRegistros = total,
             Etiquetas = etiquetas,
             Parametros = parametros
         };
     }
 
-    // Valor tal como lo espera el dashboard en la URL (el mes es 1-12, no su nombre).
-    // Devuelve null cuando el filtro no está activo.
     private static string? ValorCrudoFiltroGuardado(BsonValue valor)
     {
         if (valor.IsString)
@@ -333,44 +406,105 @@ public sealed class HomeController : Controller
     }
 
     private static DashboardFiltrosViewModel LimpiarFiltros(
-        DashboardFiltrosViewModel? filtros)
-    {
-        static string? Texto(string? valor)
-        {
-            valor = valor?.Trim();
-            return string.IsNullOrEmpty(valor) ? null
-                : valor.Length > 120 ? valor[..120] : valor;
-        }
-
-        filtros ??= new DashboardFiltrosViewModel();
-        return new DashboardFiltrosViewModel
-        {
-            Provincia = Texto(filtros.Provincia),
-            Canton = Texto(filtros.Canton),
-            Distrito = Texto(filtros.Distrito),
-            Ruta = Texto(filtros.Ruta),
-            Anio = filtros.Anio,
-            Mes = filtros.Mes,
-            DiaSemana = filtros.DiaSemana,
-            FranjaHoraria = Texto(filtros.FranjaHoraria),
-            TipoAccidente = Texto(filtros.TipoAccidente),
-            Clima = Texto(filtros.Clima),
-            EstadoCalzada = Texto(filtros.EstadoCalzada),
-            Severidad = Texto(filtros.Severidad)
-        };
-    }
+        DashboardFiltrosViewModel? filtros) =>
+        FiltrosDocumento.Limpiar(filtros);
 
     private static bool TieneFiltrosActivos(DashboardFiltrosViewModel filtros) =>
         typeof(DashboardFiltrosViewModel).GetProperties()
             .Any(propiedad => propiedad.GetValue(filtros) is not null);
 
-    private static BsonValue TextoOTodos(string? valor, string porDefecto = "Todos") =>
-        new BsonString(valor ?? porDefecto);
+    private IMongoCollection<BsonDocument> ObtenerColeccionHistorial() =>
+        HistorialConsultas.ObtenerColeccion(mongoClient!, configuracion);
 
-    // Si hay selección se guarda el número (igual que en Incidencias);
-    // si no, la etiqueta "Todos".
-    private static BsonValue NumeroOTodos(int? valor) =>
-        valor.HasValue ? new BsonInt32(valor.Value) : new BsonString("Todos");
+    private static HistorialConsultaViewModel MapearConsultaHistorial(BsonDocument documento)
+    {
+        var etiquetas = new List<(string Nombre, string Valor)>();
+        var parametros = new Dictionary<string, string>();
+
+        if (documento.TryGetValue("filtros", out var valorFiltros) && valorFiltros.IsBsonDocument)
+        {
+            etiquetas = ExtraerEtiquetas(valorFiltros.AsBsonDocument);
+            parametros = ConstruirParametros(valorFiltros.AsBsonDocument);
+        }
+
+        var cultura = new CultureInfo("es-CR");
+        var fecha = documento.TryGetValue("fecha_consulta", out var f) && f.IsBsonDateTime
+            ? f.ToUniversalTime().ToLocalTime().ToString("dd/MM/yyyy HH:mm", cultura)
+            : "";
+        var resultados = documento.TryGetValue("total_resultados", out var t)
+            && (t.IsInt32 || t.IsInt64)
+            ? t.ToInt64().ToString("N0", cultura)
+            : "No disponible";
+
+        return new HistorialConsultaViewModel
+        {
+            Fecha = fecha,
+            Filtros = etiquetas.Count == 0
+                ? "Sin filtros"
+                : string.Join(" · ", etiquetas.Select(e => $"{e.Nombre}: {e.Valor}")),
+            Resultados = resultados,
+            Parametros = parametros
+        };
+    }
+
+    private static Dictionary<string, string> ConstruirParametros(BsonDocument filtros)
+    {
+        var parametros = new Dictionary<string, string>();
+        foreach (var (campo, _, parametro) in CamposFiltroGuardado)
+        {
+            if (parametro is not null
+                && filtros.TryGetValue(campo, out var valor)
+                && ValorCrudoFiltroGuardado(valor) is { } crudo)
+            {
+                parametros["Filtros." + parametro] = crudo;
+            }
+        }
+        return parametros;
+    }
+
+    // Reconstruye los filtros del dashboard a partir de una combinación guardada.
+    private static DashboardFiltrosViewModel FiltrosDesdeDocumento(BsonDocument documento)
+    {
+        var modelo = new DashboardFiltrosViewModel();
+        if (!documento.TryGetValue("filtros", out var valorFiltros) || !valorFiltros.IsBsonDocument)
+            return modelo;
+
+        var filtros = valorFiltros.AsBsonDocument;
+        string? Texto(string campo) =>
+            filtros.TryGetValue(campo, out var valor) ? ValorCrudoFiltroGuardado(valor) : null;
+        int? Numero(string campo) =>
+            int.TryParse(Texto(campo), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)
+                ? n : null;
+
+        modelo.Provincia = Texto("provincia");
+        modelo.Canton = Texto("canton");
+        modelo.Distrito = Texto("distrito");
+        modelo.Ruta = Texto("ruta");
+        modelo.Anio = Numero("anio");
+        modelo.Mes = Numero("mes");
+        modelo.DiaSemana = Numero("dia_semana");
+        modelo.FranjaHoraria = Texto("franja_horaria");
+        modelo.TipoAccidente = Texto("tipo_accidente");
+        modelo.Clima = Texto("condicion_climatica");
+        modelo.EstadoCalzada = Texto("estado_calzada");
+        modelo.Severidad = Texto("severidad");
+        return modelo;
+    }
+
+    // Cantidad de incidentes que cumplen una combinación guardada (null si falla).
+    private static async Task<long?> ContarResultadosAsync(
+        IMongoCollection<BsonDocument> incidencias, BsonDocument documento)
+    {
+        try
+        {
+            return await incidencias.CountDocumentsAsync(
+                CrearFiltro(FiltrosDesdeDocumento(documento)));
+        }
+        catch (MongoException)
+        {
+            return null;
+        }
+    }
 
     private IMongoCollection<BsonDocument> ObtenerColeccion() =>
         mongoClient!.GetDatabase(configuracion["MongoDB:Database"])
@@ -610,7 +744,7 @@ public sealed class HomeController : Controller
             NoDisponible("Índice de severidad", "Faltan los pesos W1, W2 y W3 definidos por el SAD."),
             NoDisponible("Tiempo promedio de respuesta", "La fuente no incluye tiempos de atención o llegada."),
             NoDisponible("Víctimas", "La fuente no incluye víctimas, género ni rango de edad."),
-            NoDisponible("Fatalidad - motocicleta", "La fuente no incluye el tipo de vehículo involucrado.")
+            NoDisponible("Fatalidad · motocicleta", "La fuente no incluye el tipo de vehículo involucrado.")
         ];
 
         modelo.Provincias = provincias;

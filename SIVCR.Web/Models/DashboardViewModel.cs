@@ -5,6 +5,8 @@ public sealed class DashboardViewModel
     public DashboardFiltrosViewModel Filtros { get; set; } = new();
     public DashboardOpcionesFiltros Opciones { get; set; } = new();
     public string? ErrorMongoDB { get; set; }
+
+    public Dictionary<string, string> ParametrosExplorador { get; set; } = new();
     public int TotalIncidentes { get; set; }
     public IReadOnlyList<DashboardKpiViewModel> Indicadores { get; set; } = [];
     public IReadOnlyList<DashboardDatoViewModel> Provincias { get; set; } = [];

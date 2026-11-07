@@ -3,8 +3,12 @@ namespace SIVCR.Web.Models;
 public sealed class FiltrosGuardadosViewModel
 {
     public IReadOnlyList<FiltroGuardadoViewModel> Filtros { get; set; } = [];
+    public IReadOnlyList<HistorialConsultaViewModel> Historial { get; set; } = [];
     public string? ErrorMongoDB { get; set; }
     public string? Mensaje { get; set; }
+
+    // Filtros que el usuario tiene seleccionados en el dashboard de la sesión actual.
+    public IReadOnlyList<(string Nombre, string Valor)> FiltrosActuales { get; set; } = [];
 }
 
 public sealed class FiltroGuardadoViewModel
@@ -13,13 +17,21 @@ public sealed class FiltroGuardadoViewModel
     public string Nombre { get; set; } = "";
     public string Fecha { get; set; } = "";
 
-    // Aún no se guarda el total de registros por filtro.
     public string TotalRegistros { get; set; } = "No disponible";
 
-    // Solo los filtros que tienen un valor distinto de "Todos"/"Todas".
     public IReadOnlyList<(string Nombre, string Valor)> Etiquetas { get; set; } = [];
 
-    // Parámetros de consulta para abrir el Dashboard con esta combinación
-    // (por ejemplo "Filtros.Provincia" = "San José").
+    public Dictionary<string, string> Parametros { get; set; } = new();
+}
+
+public sealed class HistorialConsultaViewModel
+{
+    public string Fecha { get; set; } = "";
+
+    public string Filtros { get; set; } = "Sin filtros";
+
+    public string Resultados { get; set; } = "";
+
+    // Parámetros de consulta para repetir la consulta en el dashboard.
     public Dictionary<string, string> Parametros { get; set; } = new();
 }

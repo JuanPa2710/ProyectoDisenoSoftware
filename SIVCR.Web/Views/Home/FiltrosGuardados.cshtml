@@ -224,7 +224,7 @@
         padding: 0.75rem 1rem;
         margin-bottom: 1.5rem;
     }
-    /* Diálogo de confirmación: mismo aspecto que "Guardar combinación de filtros" */
+    /* Diálogo de confirmación */
     .delete-filter-dialog { width: min(420px, calc(100vw - 32px)); padding: 16px; border: 1px solid var(--sivcr-border); border-radius: 8px; background: var(--sivcr-surface); color: var(--sivcr-text); box-shadow: 0 8px 24px rgb(0 0 0 / 45%); font-family: "Open Sans", Arial, sans-serif; }
     .delete-filter-dialog::backdrop { background: rgb(0 0 0 / 60%); }
     .delete-filter-dialog p { margin: 0; color: var(--sivcr-text-soft); font-size: 14px; line-height: 20px; }
@@ -237,32 +237,6 @@
     <div class="sivcr-breadcrumb">Inicio / Filtros guardados</div>
     <h1 class="sivcr-page-title">Filtros guardados e historial</h1>
 
-    @* SECCIÓN 1: GUARDAR LA COMBINACIÓN ACTUAL *@
-    <div class="sivcr-card">
-        <div class="sivcr-card-header">
-            <h2 class="sivcr-card-title">Guardar la combinación actual</h2>
-            <span class="sivcr-card-subtitle">Filtros activos en el dashboard</span>
-        </div>
-        
-        <div class="sivcr-save-form">
-            <div class="sivcr-form-group">
-                <label class="sivcr-label">Filtros que se guardarán</label>
-                <div class="sivcr-badge-container">
-                    <span class="sivcr-badge">Año: 2025</span>
-                    <span class="sivcr-badge">Tipo de ruta: Nacional</span>
-                </div>
-            </div>
-            
-            <div class="sivcr-form-group" style="flex-grow: 2;">
-                <label class="sivcr-label" for="txtNombreCombinacion">Nombre de la combinación</label>
-                <input type="text" id="txtNombreCombinacion" class="sivcr-input" placeholder="Ej. Motocicletas de noche en la GAM">
-            </div>
-            
-            <button type="button" class="sivcr-btn sivcr-btn-primary">Guardar</button>
-        </div>
-    </div>
-
-    @* SECCIÓN 2: COMBINACIONES GUARDADAS (colección "filtros" de MongoDB) *@
     @if (!string.IsNullOrWhiteSpace(Model.Mensaje))
     {
         <div class="sivcr-ok" role="status">@Model.Mensaje</div>
@@ -272,6 +246,40 @@
         <div class="sivcr-error" role="alert">@Model.ErrorMongoDB</div>
     }
 
+    @* GUARDAR LA COMBINACIÓN ACTUAL (filtros del dashboardn) *@
+    <div class="sivcr-card">
+        <div class="sivcr-card-header">
+            <h2 class="sivcr-card-title">Guardar la combinación actual</h2>
+            <span class="sivcr-card-subtitle">Filtros activos en el dashboard</span>
+        </div>
+
+        <form asp-controller="Home" asp-action="GuardarFiltrosActuales" method="post" class="sivcr-save-form">
+            <div class="sivcr-form-group">
+                <label class="sivcr-label">Filtros que se guardarán</label>
+                <div class="sivcr-badge-container">
+                    @if (Model.FiltrosActuales.Count == 0)
+                    {
+                        <span class="sivcr-empty" style="padding:0">No hay filtros seleccionados. <a asp-controller="Home" asp-action="Index" style="color:#80bfff">Ir al Dashboard</a></span>
+                    }
+                    @foreach (var etiqueta in Model.FiltrosActuales)
+                    {
+                        <span class="sivcr-badge">@etiqueta.Nombre: @etiqueta.Valor</span>
+                    }
+                </div>
+            </div>
+
+            <div class="sivcr-form-group" style="flex-grow: 2;">
+                <label class="sivcr-label" for="txtNombreCombinacion">Nombre de la combinación</label>
+                <input type="text" id="txtNombreCombinacion" name="nombre" class="sivcr-input" maxlength="80" required
+                       placeholder="Ej. Motocicletas de noche en la GAM"
+                       disabled="@(Model.FiltrosActuales.Count == 0)">
+            </div>
+
+            <button type="submit" class="sivcr-btn sivcr-btn-primary" disabled="@(Model.FiltrosActuales.Count == 0)">Guardar</button>
+        </form>
+    </div>
+
+    @* COMBINACIONES GUARDADAS (colección "filtros" de MongoDB) *@
     <div class="sivcr-card">
         <div class="sivcr-card-header">
             <h2 class="sivcr-card-title">Combinaciones guardadas</h2>
@@ -280,7 +288,7 @@
 
         @if (Model.Filtros.Count == 0)
         {
-            <div class="sivcr-empty">Aún no hay combinaciones guardadas. Guarda una desde el Dashboard con el botón «Guardar filtros».</div>
+            <div class="sivcr-empty">Aún no hay combinaciones guardadas.</div>
         }
 
         @foreach (var filtro in Model.Filtros)
@@ -308,11 +316,11 @@
         }
     </div>
 
-    @* SECCIÓN 3: HISTORIAL DE CONSULTAS *@
+    @* HISTORIAL DE CONSULTAS (colección "HistorialConsulta" de MongoDB) *@
     <div class="sivcr-card">
         <div class="sivcr-card-header">
             <h2 class="sivcr-card-title">Historial de consultas</h2>
-            <span class="sivcr-card-subtitle">Últimas 5 consultas</span>
+            <span class="sivcr-card-subtitle">@(Model.Historial.Count == 0 ? "Sin consultas" : Model.Historial.Count == 1 ? "Última consulta" : $"Últimas {Model.Historial.Count} consultas")</span>
         </div>
 
         <table class="sivcr-table">
@@ -325,36 +333,21 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>03/10/2026 09:42</td>
-                    <td>Año: 2025 · Tipo de ruta: Nacional</td>
-                    <td style="text-align: right;">10 610</td>
-                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
-                </tr>
-                <tr>
-                    <td>02/10/2026 16:15</td>
-                    <td>Provincia: San José · Cantón: Escazú · Tipo de vehículo: Bicicleta</td>
-                    <td style="text-align: right;">0</td>
-                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
-                </tr>
-                <tr>
-                    <td>02/10/2026 11:03</td>
-                    <td>Ruta: 32 - Clima: Lluvia · Estado de calzada: Húmeda</td>
-                    <td style="text-align: right;">486</td>
-                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
-                </tr>
-                <tr>
-                    <td>01/10/2026 18:27</td>
-                    <td>Franja horaria: Noche · Tipo de vehículo: Motocicleta</td>
-                    <td style="text-align: right;">2 973</td>
-                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
-                </tr>
-                <tr>
-                    <td>30/09/2026 08:50</td>
-                    <td>Sin filtros</td>
-                    <td style="text-align: right;">10 610</td>
-                    <td><a href="#" class="sivcr-action-repeat">Repetir consulta</a></td>
-                </tr>
+                @if (Model.Historial.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" class="sivcr-empty">Aún no hay consultas registradas. Se registran al abrir el Explorador de registros.</td>
+                    </tr>
+                }
+                @foreach (var consulta in Model.Historial)
+                {
+                    <tr>
+                        <td>@consulta.Fecha</td>
+                        <td>@consulta.Filtros</td>
+                        <td style="text-align: right;">@consulta.Resultados</td>
+                        <td><a asp-controller="Home" asp-action="Index" asp-all-route-data="consulta.Parametros" class="sivcr-action-repeat">Repetir consulta</a></td>
+                    </tr>
+                }
             </tbody>
         </table>
     </div>

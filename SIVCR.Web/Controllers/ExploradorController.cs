@@ -56,6 +56,15 @@ public sealed class ExploradorController : Controller {
                     .Find(filtroMongo)
                     .ToListAsync();
 
+                var incidencias = configuracion["MongoDB:Collection"];
+                if (string.IsNullOrWhiteSpace(incidencias)) {
+                    incidencias = "Incidencias";
+                }
+                if (nombreColeccion.Equals(incidencias, StringComparison.OrdinalIgnoreCase)) {
+                    await HistorialConsultas.RegistrarAsync(
+                        mongoClient, configuracion, filtros, documentos.Count);
+                }
+
                 return View(CrearConsultaDinamica(
                     nombreColeccion,
                     documentos

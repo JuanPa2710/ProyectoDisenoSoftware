@@ -75,6 +75,15 @@ builder.Services.AddHttpClient("CargaDatosApi", client =>
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// Conserva los filtros del dashboard al cambiar de pantalla.
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(opciones =>
+{
+    opciones.IdleTimeout = TimeSpan.FromHours(2);
+    opciones.Cookie.HttpOnly = true;
+    opciones.Cookie.IsEssential = true;
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -86,6 +95,7 @@ if (!app.Environment.IsDevelopment()) {
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseSession();
 
 app.UseAuthorization();
 

@@ -15,8 +15,7 @@
     });
 })();
 
-// Guardar filtros: lee todos los combos del formulario y los envía al servidor,
-// que los inserta en la colección "Filtros" de MongoDB.
+// Guarda filtros y los inserta en la colección "Filtros" de MongoDB.
 (() => {
     const form = document.querySelector(".dashboard-filters");
     const boton = document.getElementById("btn-guardar-filtros");
@@ -29,7 +28,6 @@
     const aviso = document.getElementById("guardar-filtros-aviso");
     const numericos = new Set(["Anio", "Mes", "DiaSemana"]);
 
-    // Combos -> { provincia: "...", anio: 2025, ... } (null si está en "Todos").
     const leerFiltros = () => {
         const filtros = {};
         for (const select of form.querySelectorAll("select[name^='Filtros.']")) {
