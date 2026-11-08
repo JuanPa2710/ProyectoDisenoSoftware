@@ -321,6 +321,16 @@
     background: var(--sivcr-primary);
 }
 
+.explorador_numeros_separador {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    color: var(--sivcr-text-muted);
+    user-select: none;
+}
+
 .explorador_modal_sin_exportacion {
     max-width: 480px;
 }
