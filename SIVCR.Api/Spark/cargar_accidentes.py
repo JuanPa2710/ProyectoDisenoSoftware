@@ -56,7 +56,7 @@ if formato not in {".csv", ".json", ".xlsx"}:
 codificacion_csv = "utf-8-sig"
 separador_csv = ";"
 
-# Revisar el encabezado antes de que Spark lea el archivo CSV.
+# revisar el encabezado antes de que spark lea el CSV
 if formato == ".csv":
     try:
         codificacion_csv = detectar_codificacion_csv(ruta_entrada)

@@ -176,7 +176,7 @@
     function renderizar() {
         filtrados = [...todos];
 
-        // ordena una copia de los registros, sin modificar la fuente original.
+        // ordena una copia de los registros
         filtrados.sort((a, b) => {
             for (const orden of ordenes) {
                 const resultado = String(a[orden.campo] || "")
