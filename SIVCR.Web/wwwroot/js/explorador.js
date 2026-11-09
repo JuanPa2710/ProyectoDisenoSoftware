@@ -132,6 +132,41 @@
         return "";
     }
 
+    function paginasVisibles(totalPaginas, paginaActual) {
+        if (totalPaginas <= 7) {
+            const paginas = [];
+            for (let numero = 1; numero <= totalPaginas; numero++) {
+                paginas.push(numero);
+            }
+            return paginas;
+        }
+
+        if (paginaActual <= 4) {
+            return [1, 2, 3, 4, 5, null, totalPaginas];
+        }
+
+        if (paginaActual >= totalPaginas - 3) {
+            const paginas = [];
+            paginas.push(1, null);
+            for (let numero = totalPaginas - 4; numero <= totalPaginas; numero++) {
+                paginas.push(numero);
+            }
+            return paginas;
+        }
+
+        return [
+            1,
+            null,
+            paginaActual - 2,
+            paginaActual - 1,
+            paginaActual,
+            paginaActual + 1,
+            paginaActual + 2,
+            null,
+            totalPaginas
+        ];
+    }
+
     function escapar(valor) {
         const elemento = document.createElement("span");
         elemento.textContent = valor;
@@ -190,8 +225,16 @@
         anterior.disabled = pagina <= 1 || !hayResultados;
         siguiente.disabled = pagina >= totalPaginas || !hayResultados;
         numeros.innerHTML = "";
-        for (let numero = 1; numero <= totalPaginas; numero++) {
-            if (totalPaginas > 7 && numero > 4 && numero < totalPaginas) continue;
+        for (const numero of paginasVisibles(totalPaginas, pagina)) {
+            if (numero === null) {
+                const separador = document.createElement("span");
+                separador.className = "explorador_numeros_separador";
+                separador.textContent = "…";
+                separador.setAttribute("aria-hidden", "true");
+                numeros.appendChild(separador);
+                continue;
+            }
+
             const boton = document.createElement("button");
             boton.type = "button";
             boton.textContent = numero;
@@ -266,8 +309,19 @@
     });
 
     // controles de avance y retroceso entre páginas
-    anterior.addEventListener("click", () => { pagina--; renderizar(); });
-    siguiente.addEventListener("click", () => { pagina++; renderizar(); });
+    anterior.addEventListener("click", () => {
+        if (pagina > 1) {
+            pagina--;
+            renderizar();
+        }
+    });
+    siguiente.addEventListener("click", () => {
+        const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
+        if (pagina < totalPaginas) {
+            pagina++;
+            renderizar();
+        }
+    });
     document.getElementById("reintentar").addEventListener("click", iniciarCarga);
 
     // abre las opciones o el aviso según los resultados de la consulta
