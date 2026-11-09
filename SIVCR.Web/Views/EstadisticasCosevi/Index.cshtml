@@ -1,0 +1,72 @@
+@model SIVCR.Web.Models.EstadisticasCoseviViewModel
+@{
+    ViewData["Title"] = "Accidentes y personas por lugar y período";
+}
+<h1>Accidentes y personas por lugar y período</h1>
+<p>Conteos independientes agrupados por año, mes, provincia, cantón y distrito.
+   No identifican a las personas que participaron en un accidente concreto.</p>
+<p>Los archivos facilitados cubren accidentes de 2018–2024 y personas de 2020–2025.
+   Su intervalo común es 2020–2024. Los conteos reflejan únicamente los datos cargados.</p>
+<form method="get" asp-action="Index">
+    <label for="anio">Año</label>
+    <input id="anio" name="anio" type="number" min="1900" value="@Model.Anio" required />
+    <label for="mes">Mes (vacío: todos)</label>
+    <input id="mes" name="mes" type="number" min="1" max="12" value="@Model.Mes" />
+    <label for="provincia">Provincia</label>
+    <input id="provincia" name="provincia" maxlength="100" value="@Model.Provincia" />
+    <label for="canton">Cantón</label>
+    <input id="canton" name="canton" maxlength="100" value="@Model.Canton" />
+    <label for="distrito">Distrito</label>
+    <input id="distrito" name="distrito" maxlength="100" value="@Model.Distrito" />
+    <button type="submit">Consultar</button>
+</form>
+<p>Ubicación: escribí el nombre completo como figura en la fuente, con sus tildes.
+   Los filtros de ruta, hora, clima y tipo de accidente no aplican a esta comparación.</p>
+@if (Model.Error is not null)
+{
+    <p role="alert">@Model.Error</p>
+}
+else
+{
+    <p><strong>Registros de accidentes:</strong> @Model.TotalAccidentes.ToString("N0") ·
+       <strong>Registros de personas:</strong> @Model.TotalPersonas.ToString("N0")</p>
+    <p>El total de personas incluye ilesos. No representa personas únicas ni equivale
+       a víctimas heridas o fallecidas. No se calcula una razón de personas por accidente.</p>
+    <p>«Sin registros» indica que no hay datos cargados para esa combinación;
+       no demuestra ausencia de accidentes o personas en la realidad.</p>
+    <div style="overflow-x:auto">
+        <table class="table">
+            <thead><tr><th>Mes</th><th>Provincia</th><th>Cantón</th><th>Distrito</th>
+                <th>Accidentes</th><th>Personas</th></tr></thead>
+            <tbody>
+                @foreach (var fila in Model.Filas)
+                {
+                    <tr>
+                        <td>@(fila.Mes == 0 ? "No informado" : fila.Mes.ToString())</td>
+                        <td>@(string.IsNullOrEmpty(fila.Provincia) ? "No informada" : fila.Provincia)</td>
+                        <td>@(string.IsNullOrEmpty(fila.Canton) ? "No informado" : fila.Canton)</td>
+                        <td>@(string.IsNullOrEmpty(fila.Distrito) ? "No informado" : fila.Distrito)</td>
+                        <td>@(fila.Accidentes?.ToString("N0") ?? "Sin registros")</td>
+                        <td>@(fila.Personas?.ToString("N0") ?? "Sin registros")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.Filas.Count == 0) { <p>No hay registros para estos filtros.</p> }
+    <p>Página @Model.Pagina de @Model.TotalPaginas</p>
+    @if (Model.Pagina > 1)
+    {
+        <a asp-action="Index" asp-route-anio="@Model.Anio" asp-route-mes="@Model.Mes"
+           asp-route-provincia="@Model.Provincia" asp-route-canton="@Model.Canton"
+           asp-route-distrito="@Model.Distrito" asp-route-pagina="@(Model.Pagina - 1)">Anterior</a>
+    }
+    @if (Model.Pagina < Model.TotalPaginas)
+    {
+        <a asp-action="Index" asp-route-anio="@Model.Anio" asp-route-mes="@Model.Mes"
+           asp-route-provincia="@Model.Provincia" asp-route-canton="@Model.Canton"
+           asp-route-distrito="@Model.Distrito" asp-route-pagina="@(Model.Pagina + 1)">Siguiente</a>
+    }
+}
+<p><a asp-controller="Cargas" asp-action="Lote">Cargar archivos</a> ·
+   <a asp-controller="Home" asp-action="Index">Volver al dashboard</a></p>

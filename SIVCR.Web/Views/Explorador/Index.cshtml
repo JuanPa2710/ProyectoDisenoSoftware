@@ -1,0 +1,278 @@
+@model SIVCR.Web.Models.ExploradorConsultaViewModel
+
+@{
+    ViewData["Title"] = "Explorador de registros";
+}
+
+<section class="explorador"
+         aria-labelledby="explorador_titulo">
+    <header class="explorador_encabezado">
+        <div>
+            <p class="explorador_breadcrumb">
+                Inicio / Explorador de registros
+            </p>
+            <h1 id="explorador_titulo">
+                Explorador de registros viales
+            </h1>
+        </div>
+    </header>
+
+    <section class="explorador_panel"
+             aria-label="Consulta de incidentes">
+        <div class="explorador_herramientas">
+            <div class="explorador_acciones">
+                <form method="get" action="@Url.Action("Index", "Explorador")">
+                    @foreach (var nombreFiltro in Context.Request.Query.Keys)
+                    {
+                        if (nombreFiltro != null && nombreFiltro.StartsWith("Filtros.", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <input type="hidden"
+                                   name="@nombreFiltro"
+                                   value="@Context.Request.Query[nombreFiltro]" />
+                        }
+                    }
+                    <label for="coleccion_explorador">Colección</label>
+                    <select id="coleccion_explorador"
+                            name="collection"
+                            onchange="this.form.submit()">
+                        <option value="Incidencias" selected="@(Model.Coleccion == "Incidencias")">Accidentes</option>
+                        <option value="PersonasAccidentes" selected="@(Model.Coleccion == "PersonasAccidentes")">Personas accientadas</option>
+                        <option value="RedVial" selected="@(Model.Coleccion == "RedVial")">Red vial</option>
+                    </select>
+                </form>
+
+                <button id="abrir_exportacion"
+                        class="sivcr-button sivcr-button--primary"
+                        type="button">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M3 15v2h14v-2" />
+                    </svg>
+                    Exportar
+                </button>
+                
+                <!--
+                <button id="ordenar_consulta"
+                        class="explorador_accion"
+                        type="button">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M7 4v12M4.5 7 7 4l2.5 3M13 16V4M10.5 13 13 16l2.5-3" />
+                    </svg>
+                    Ordenar
+                </button>
+                -->
+
+                <details class="explorador_columnas">
+                    <summary class="explorador_accion">
+                        <svg viewBox="0 0 20 20"
+                             aria-hidden="true">
+                            <path d="M3 4h14v12H3zM8 4v12M12 4v12" />
+                        </svg>
+                        Columnas
+                    </summary>
+                    <div class="explorador_columnas_menu"
+                         id="menu_columnas">
+                    </div>
+                </details>
+
+                <a class="explorador_accion"
+                   asp-controller="Home"
+                   asp-action="Index">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M3 5h14M3 10h14M3 15h14M6 3v4M14 8v4M9 13v4" />
+                    </svg>
+                    Editar filtros
+                </a>
+            </div>
+
+        </div>
+
+        <div id="estado_carga"
+             class="explorador_estado">
+            <span class="explorador_spinner"
+                  aria-hidden="true"></span>
+            <strong>Cargando registros...</strong>
+        </div>
+
+        <div id="estado_error"
+             class="explorador_estado explorador_estado_error"
+             hidden>
+            <strong>No se pudieron cargar los registros.</strong>
+            <p>Revisá la consulta e intentá nuevamente.</p>
+
+            <button id="reintentar"
+                    type="button"
+                    class="sivcr-button sivcr-button--secondary">
+                Reintentar
+            </button>
+        </div>
+
+        <div id="contenido_tabla">
+            <div class="explorador_tabla_contenedor">
+                <table class="explorador_tabla"
+                       aria-label="Incidentes viales">
+                    <thead>
+                        <tr>
+                        </tr>
+                    </thead>
+                    <tbody id="filas_registros"></tbody>
+                </table>
+            </div>
+
+            <div id="sin_resultados"
+                 class="explorador_sin_resultados"
+                 hidden>
+                <svg viewBox="0 0 24 24"
+                     aria-hidden="true">
+                    <circle cx="10.5"
+                            cy="10.5"
+                            r="5.5" />
+                    <path d="m14.5 14.5 5 5M7 10.5h7" />
+                </svg>
+                <strong>No hay registros para exportar</strong>
+            </div>
+
+            <footer class="explorador_paginacion">
+                <span id="rango_registros"></span>
+
+                <div aria-label="Paginación">
+                    <button id="pagina_anterior"
+                            type="button"
+                            aria-label="Página anterior">
+                        <svg viewBox="0 0 20 20"
+                             aria-hidden="true">
+                            <path d="m12.5 4-6 6 6 6" />
+                        </svg>
+                    </button>
+
+                    <span id="numeros_pagina"
+                          class="explorador_numeros"></span>
+
+                    <button id="pagina_siguiente"
+                            type="button"
+                            aria-label="Página siguiente">
+                        <svg viewBox="0 0 20 20"
+                             aria-hidden="true">
+                            <path d="m7.5 4 6 6-6 6" />
+                        </svg>
+                    </button>
+                </div>
+            </footer>
+        </div>
+    </section>
+</section>
+
+<div class="modal fade"
+     id="dialogo_exportacion"
+     tabindex="-1"
+     aria-labelledby="exportacion_titulo"
+     aria-hidden="true">
+     <div class="modal-dialog modal-dialog-centered explorador_modal">
+        <div class="modal-content">
+            <header class="explorador_modal_encabezado">
+                 <div>
+                     <h2 id="exportacion_titulo">Exportar consulta</h2>
+                 </div>
+                 <button type="button"
+                         class="explorador_modal_cerrar"
+                         data-bs-dismiss="modal"
+                        aria-label="Cerrar">
+                    <svg viewBox="0 0 20 20"
+                         aria-hidden="true">
+                        <path d="M5 5l10 10M15 5 5 15" />
+                    </svg>
+                </button>
+            </header>
+
+            <div id="exportacion_sin_resultados"
+                 class="explorador_modal_aviso"
+                 hidden>
+                <svg viewBox="0 0 20 20"
+                     aria-hidden="true">
+                    <path d="M10 2.5 18 17H2L10 2.5Z" />
+                    <path d="M10 7v4M10 14h.01" />
+                </svg>
+
+                <div>
+                    <strong>No hay registros para exportar</strong>
+                </div>
+            </div>
+
+            <div id="exportacion_con_resultados">
+                <p class="explorador_modal_detalle">
+                    Se exportarán <strong id="cantidad_exportar">0 registros</strong>.
+                </p>
+
+                <fieldset class="explorador_modal_formatos">
+                    <legend>Formato</legend>
+
+                    <label>
+                        <input type="radio"
+                               name="formato_exportacion"
+                               value="csv"
+                               checked />
+                        <span>
+                            <strong>CSV</strong>
+                        </span>
+                    </label>
+
+                    <label>
+                        <input type="radio"
+                               name="formato_exportacion"
+                               value="excel" />
+                        <span>
+                            <strong>Excel (.xlsx)</strong>
+                        </span>
+                    </label>
+
+                    <label>
+                        <input type="radio"
+                               name="formato_exportacion"
+                               value="pdf" />
+                        <span>
+                            <strong>PDF</strong>
+                        </span>
+                    </label>
+                </fieldset>
+            </div>
+
+            <div id="exportacion_completada"
+                 class="explorador_modal_completado"
+                 role="status"
+                 hidden>
+                <strong>Exportación iniciada</strong>
+                <p>El archivo se descargará automáticamente.</p>
+            </div>
+
+            <footer class="explorador_modal_acciones">
+                <button type="button"
+                        class="sivcr-button sivcr-button--secondary"
+                        data-bs-dismiss="modal">
+                    Cerrar
+                </button>
+
+                <button id="confirmar_exportacion"
+                        type="button"
+                        class="sivcr-button sivcr-button--primary">
+                    Exportar
+                </button>
+            </footer>
+        </div>
+    </div>
+</div>
+
+<script id="datos_registros"
+        type="application/json">
+@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model))
+</script>
+
+@section Scripts {
+    <script src="~/lib/jspdf/jspdf.umd.min.js"
+            asp-append-version="true"></script>
+    <script src="~/js/explorador-pdf.js"
+            asp-append-version="true"></script>
+    <script src="~/js/explorador.js"
+            asp-append-version="true"></script>
+}

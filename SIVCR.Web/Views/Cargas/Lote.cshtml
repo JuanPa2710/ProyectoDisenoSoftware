@@ -1,0 +1,76 @@
+@{
+    ViewData["Title"] = "Carga de varios archivos";
+}
+
+<section id="cargas-lote" class="cargas"
+         data-subir="@Url.Action("SubirLoteArchivo", "Cargas")"
+         data-procesar="@Url.Action("ProcesarLoteArchivo", "Cargas")"
+         data-importar="@Url.Action("ImportarLoteArchivo", "Cargas")"
+         data-reporte="@Url.Action("DescargarReporte", "Cargas")"
+         data-rechazados="@Url.Action("DescargarRechazados", "Cargas")">
+    <header>
+        <p class="cargas__breadcrumb">Inicio / Administración / <a asp-action="Index">Carga de datos</a> / Lote</p>
+        <h1>Carga de varios archivos</h1>
+    </header>
+
+    <div class="cargas__columnas">
+        <section class="cargas__panel">
+            <h2>1. Archivos de origen</h2>
+            <form id="lote-formulario">
+                @Html.AntiForgeryToken()
+                <div class="cargas__selector">
+                    <svg class="cargas__icono" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 16V3M7 8l5-5 5 5" />
+                        <path d="M4 15v5h16v-5" />
+                    </svg>
+                    <label for="lote-archivos">Seleccioná archivos de accidentes, personas o red vial</label>
+                    <input id="lote-archivos" type="file" multiple accept=".csv,.json,.xlsx" aria-describedby="lote-ayuda" />
+                    <p id="lote-ayuda" class="cargas__ayuda">Hasta 10 archivos por selección y 50 MiB por archivo. En Windows, usá Ctrl + clic para elegir varios.</p>
+                    <p class="cargas__ayuda">CSV en UTF-8 o Windows-1252, con coma o punto y coma. También se admiten JSON y Excel (.xlsx).</p>
+                </div>
+                <div class="cargas__acciones">
+                    <button type="submit" class="sivcr-button sivcr-button--primary">Subir y procesar pendientes</button>
+                </div>
+            </form>
+            <p id="lote-aviso" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="cargas__panel">
+            <h2>2. Destino de los datos</h2>
+            <p>Los archivos se procesan uno por uno. Cada archivo tiene su propio reporte.</p>
+            <ul class="cargas__validaciones">
+                <li class="cargas__validacion"><strong>Accidentes COSEVI</strong><span>Incidencias</span></li>
+                <li class="cargas__validacion"><strong>Personas en accidentes</strong><span>PersonasAccidentes</span></li>
+                <li class="cargas__validacion"><strong>Red Vial Nacional</strong><span>RedVial</span></li>
+            </ul>
+            <p class="cargas__ayuda">Podés comparar accidentes y personas por lugar y período. Esa coincidencia no identifica el accidente de una persona.</p>
+        </section>
+    </div>
+
+    <section class="cargas__panel">
+        <h2>3. Reportes e importación</h2>
+        <p>Revisá los resultados de cada archivo antes de confirmar la importación.</p>
+        <div class="cargas__tabla-contenedor">
+            <table class="cargas__tabla" aria-label="Resultados por archivo">
+                <thead>
+                    <tr><th>Archivo</th><th>Perfil</th><th>Aceptados</th><th>Rechazados</th><th>Estado</th><th>Reporte</th></tr>
+                </thead>
+                <tbody id="lote-resultados"></tbody>
+            </table>
+        </div>
+        <p class="cargas__ayuda"><strong>Reimportar un archivo como carga nueva puede duplicar datos.</strong> Si una importación queda sin confirmar, verificá su estado. Reintentar desde este lote conserva el identificador de la carga.</p>
+        <div class="cargas__acciones">
+            <button id="lote-nuevo" type="button" class="sivcr-button sivcr-button--secondary">Iniciar otro lote</button>
+            <button id="lote-importar" type="button" class="sivcr-button sivcr-button--primary" disabled>Confirmar importación de archivos válidos pendientes</button>
+        </div>
+    </section>
+
+    <nav aria-label="Otras opciones de carga">
+    <a asp-action="Index">Carga individual</a>
+</nav>
+    <noscript>Para varios archivos necesitás JavaScript. Podés usar la carga individual.</noscript>
+</section>
+
+@section Scripts {
+    <script src="~/js/cargas-lote.js" asp-append-version="true"></script>
+}
