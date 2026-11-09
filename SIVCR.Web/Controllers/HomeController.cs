@@ -58,7 +58,7 @@ public sealed class HomeController : Controller
             var totalPersonas = personas.CountDocumentsAsync(filtroPersonas);
             var totalVictimas = personas.CountDocumentsAsync(filtroVictimas);
             var provincias = AgruparAsync(coleccion, filtro, "ubicacion.provincia", 7);
-            var vehiculos = AgruparAsync(personas, filtroPersonas, "vehiculo", 5);
+            var vehiculos = AgruparAsync(personas, filtroPersonas, "vehiculo", 0);
             var demografia = ObtenerDemografiaAsync(personas, filtroVictimas);
             var severidades = AgruparAsync(coleccion, filtro, "clase_accidente", 4);
             var rutas = AgruparAsync(coleccion, filtro, "ubicacion.ruta", 7);
@@ -871,15 +871,16 @@ public sealed class HomeController : Controller
             { "cantidad", new BsonDocument("$sum", 1) }
         };
 
-        var resultados = await coleccion.Aggregate()
+        var consulta = coleccion.Aggregate()
             .Match(constructor.And(
                 filtro,
                 constructor.Ne(campo, BsonNull.Value),
                 constructor.Ne(campo, "")))
             .Group(grupo)
-            .Sort(new BsonDocument("cantidad", -1))
-            .Limit(limite)
-            .ToListAsync();
+            .Sort(new BsonDocument("cantidad", -1));
+        var resultados = limite > 0
+            ? await consulta.Limit(limite).ToListAsync()
+            : await consulta.ToListAsync();
 
         return resultados
             .Where(resultado => resultado.TryGetValue("_id", out var valor)
@@ -1010,7 +1011,39 @@ public sealed class HomeController : Controller
         modelo.TotalPersonas = totalPersonas;
         modelo.TotalVictimas = totalVictimas;
         AsignarPorcentajes(provincias, total);
-        AsignarPorcentajes(vehiculos, totalPersonas);
+        var vehiculosPrincipales = vehiculos.Take(5).ToList();
+        var vehiculosDonut = vehiculosPrincipales.ToList();
+        var coloresVehiculos = new[] { "#479ef5", "#2886de", "#7e57c2", "#f5a623", "#d55b8c" };
+        for (var indice = 0; indice < vehiculosDonut.Count; indice++)
+            vehiculosDonut[indice].Color = coloresVehiculos[indice % coloresVehiculos.Length];
+
+        var cantidadOtrosVehiculos = Math.Max(
+            0,
+            vehiculos.Sum(dato => dato.Cantidad) - vehiculosPrincipales.Sum(dato => dato.Cantidad));
+        if (cantidadOtrosVehiculos > 0)
+        {
+            vehiculosDonut.Add(new DashboardDatoViewModel
+            {
+                Etiqueta = "Otros",
+                Cantidad = cantidadOtrosVehiculos,
+                Color = "#555555"
+            });
+        }
+
+        var cantidadSinDatoVehiculo = Math.Max(
+            0,
+            totalPersonas - vehiculos.Sum(dato => dato.Cantidad));
+        if (cantidadSinDatoVehiculo > 0)
+        {
+            vehiculosDonut.Add(new DashboardDatoViewModel
+            {
+                Etiqueta = "Sin dato",
+                Cantidad = cantidadSinDatoVehiculo,
+                Color = "#858585"
+            });
+        }
+        AsignarPorcentajes(vehiculosDonut, totalPersonas);
+
         AsignarPorcentajes(severidades, total);
         foreach (var severidad in severidades)
             severidad.Color = ColorSeveridad(severidad.Etiqueta);
@@ -1073,10 +1106,12 @@ public sealed class HomeController : Controller
         ];
 
         modelo.Provincias = provincias;
-        modelo.Vehiculos = vehiculos;
+        modelo.Vehiculos = vehiculosDonut;
         modelo.Demografia = demografia;
         modelo.Severidades = severidades;
-        modelo.VehiculoDonutCss = CrearGraficoCircular(modelo.Vehiculos);
+        modelo.VehiculoDonutCss = CrearGraficoCircular(
+            modelo.Vehiculos,
+            modelo.Vehiculos.Select(dato => dato.Color).ToArray());
         modelo.SeveridadPieCss = CrearGraficoCircular(
             modelo.Severidades,
             modelo.Severidades.Select(dato => dato.Color).ToArray());
@@ -1188,7 +1223,9 @@ public sealed class HomeController : Controller
 
         for (var indice = 0; indice < datos.Count; indice++)
         {
-            var final = Math.Min(100m, inicio + datos[indice].Porcentaje);
+            var final = indice == datos.Count - 1
+                ? 100m
+                : Math.Min(100m, inicio + datos[indice].Porcentaje);
             segmentos.Add(
                 $"{colores[indice % colores.Count]} {inicio.ToString(CultureInfo.InvariantCulture)}% {final.ToString(CultureInfo.InvariantCulture)}%");
             inicio = final;

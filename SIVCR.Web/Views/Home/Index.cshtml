@@ -147,12 +147,12 @@
     </article>
 
     <article class="dashboard-card chart-card vehicle-card">
-      <header class="chart-card__header"><h2>Vehículo de las personas involucradas</h2><span>% de registros de personas · cinco principales</span></header>
+      <header class="chart-card__header"><h2>Vehículo de las personas involucradas</h2><span>Cinco principales, otros y sin dato</span></header>
       <div class="vehicle-card__content">
         <div class="donut" style="background: @Model.VehiculoDonutCss"><div><strong>@Formatear(Model.TotalPersonas)</strong><span>personas</span></div></div>
         <ul class="chart-legend">
           @if (Model.Vehiculos.Count == 0) { <li class="dashboard-empty">No hay datos para mostrar.</li> }
-          @foreach (var tipo in Model.Vehiculos.Select((dato, indice) => new { dato, indice })) { <li><i class="legend-@((tipo.indice % 5) + 1)"></i><span>@tipo.dato.Etiqueta</span><b>@Porcentaje(tipo.dato.Porcentaje)</b></li> }
+          @foreach (var tipo in Model.Vehiculos) { <li><i style="background-color:@tipo.Color"></i><span>@tipo.Etiqueta</span><b>@Porcentaje(tipo.Porcentaje)</b></li> }
         </ul>
       </div>
     </article>
@@ -176,9 +176,15 @@
             var anchoHombres = fila.Hombres * 100m / maximoDemografico;
             var anchoMujeres = fila.Mujeres * 100m / maximoDemografico;
             <div>
-              <span class="men" style="width:@anchoHombres%" title="@fila.Hombres hombres">@(fila.Hombres == 0 ? "" : Formatear(fila.Hombres))</span>
+              <div class="demographic-side demographic-side--men">
+                <strong class="demographic-count">@Formatear(fila.Hombres)</strong>
+                <div class="demographic-track" title="@fila.Hombres hombres"><i class="men" style="width:@(anchoHombres.ToString(CultureInfo.InvariantCulture))%"></i></div>
+              </div>
               <b>@fila.RangoEdad</b>
-              <span class="women" style="width:@anchoMujeres%" title="@fila.Mujeres mujeres">@(fila.Mujeres == 0 ? "" : Formatear(fila.Mujeres))</span>
+              <div class="demographic-side demographic-side--women">
+                <div class="demographic-track" title="@fila.Mujeres mujeres"><i class="women" style="width:@(anchoMujeres.ToString(CultureInfo.InvariantCulture))%"></i></div>
+                <strong class="demographic-count">@Formatear(fila.Mujeres)</strong>
+              </div>
             </div>
           }
         </div>
